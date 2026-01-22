@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "manifest-manager"
+version = "2.2.1"  # <--- UPDATED
+description = "A robust, transactional CLI for managing hierarchical XML manifests."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Nick Gunther", email = "nlgun@example.com"}
+]
+keywords = ["xml", "cli", "manifest", "task-manager"]
+dependencies = [
+    "lxml>=4.9.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov"
+]
+
+[project.scripts]
+manifest = "manifest:main"
+
+[tool.setuptools]
+py-modules = ["manifest"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
