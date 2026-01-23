@@ -4,34 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "manifest-manager"
-version = "2.2.1"  # <--- UPDATED
-description = "A robust, transactional CLI for managing hierarchical XML manifests."
+version = "3.0.0"
+description = "A transactional CLI for hierarchical data management."
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MIT"}
-authors = [
-    {name = "Nick Gunther", email = "nlgun@example.com"}
-]
-keywords = ["xml", "cli", "manifest", "task-manager"]
 dependencies = [
-    "lxml>=4.9.0"
+    "lxml",
+    "py7zr"
+]
+authors = [
+  {name = "Your Name", email = "you@example.com"}
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0",
-    "pytest-cov"
-]
-
+# This allows you to type 'manifest' in your terminal to run the app
 [project.scripts]
 manifest = "manifest:main"
 
+# CRITICAL: Explicitly list your modules since they are in the root
 [tool.setuptools]
-py-modules = ["manifest"]
-
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-ra -q"
-testpaths = [
-    "tests",
-]
+py-modules = ["manifest", "manifest_core", "storage"]

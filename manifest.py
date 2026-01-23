@@ -351,6 +351,13 @@ class ManifestShell(cmd.Cmd):
         return True
     def do_EOF(self, _): return self.do_exit(_)
 
+# ... (rest of the file remains the same)
+
+def main():
+    try: 
+        ManifestShell().cmdloop()
+    except KeyboardInterrupt: 
+        print("\nInterrupted.")
+
 if __name__ == "__main__":
-    try: ManifestShell().cmdloop()
-    except KeyboardInterrupt: print("\nInterrupted.")
+    main()

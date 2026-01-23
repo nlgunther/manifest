@@ -1,34 +1,8 @@
 """
 Manifest Core - Business Logic Layer
 ====================================
-
 Contains the domain model, repository pattern implementation,
 and view rendering for hierarchical XML data management.
-
-Classes:
-    NodeSpec: Data transfer object for node operations
-    Result: Standardized operation return type
-    TaskStatus: Enumeration of valid task states
-    Validator: Tag and content validation utilities
-    ManifestRepository: Core CRUD operations on XML tree
-    ManifestView: Stateless rendering engine
-
-Example:
-    >>> repo = ManifestRepository()
-    >>> repo.load("tasks.xml")
-    >>> repo.add_node("/*", NodeSpec(tag="task", topic="New Task"))
-    >>> repo.save()
-
-Architecture:
-    - Repository pattern for data access
-    - Transaction support with automatic rollback
-    - XPath-based queries with safety wrapper
-    - Immutable Result objects for operation outcomes
-
-Security:
-    - XML tag name validation (prevents reserved prefixes)
-    - Control character sanitization in text content
-    - Safe XPath evaluation with error containment
 """
 
 import os
@@ -117,22 +91,6 @@ class ManifestRepository:
 
     @contextmanager
     def transaction(self):
-        """Context manager that provides automatic rollback on errors.
-        
-        Creates a snapshot of the XML tree before executing operations.
-        If an exception occurs, restores the tree to its original state.
-        
-        Yields:
-            None - just provides context for safe operations
-            
-        Raises:
-            Exception: Re-raises any exception after rollback
-            
-        Example:
-            >>> with repo.transaction():
-            ...     repo.add_node("/*", NodeSpec(tag="task"))
-            ...     # If error occurs, changes are rolled back
-        """
         if self.tree is None: yield; return
         snapshot = etree.tostring(self.root)
         prev_mod = self.modified
@@ -145,15 +103,6 @@ class ManifestRepository:
             raise e
 
     def _safe_xpath(self, xpath: str) -> tuple[bool, Union[List[etree._Element], str]]:
-        """Execute XPath safely, returning (success, results_or_error).
-        
-        Args:
-            xpath: XPath expression to evaluate
-            
-        Returns:
-            (True, list of elements) on success
-            (False, error message) on failure
-        """
         try:
             return True, self.root.xpath(xpath)
         except etree.XPathEvalError as e:
@@ -197,10 +146,8 @@ class ManifestRepository:
         with self.transaction():
             Validator.validate_tag(spec.tag)
             ok, parents = self._safe_xpath(parent_xpath)
-            if not ok:
-                return Result.fail(parents)  # parents contains error message
-            if not parents:
-                return Result.fail(f"Parent not found: {parent_xpath}")
+            if not ok: return Result.fail(parents)
+            if not parents: return Result.fail(f"Parent not found: {parent_xpath}")
             
             for p in parents:
                 n = etree.SubElement(p, spec.tag, **spec.to_xml_attrs())
@@ -212,10 +159,8 @@ class ManifestRepository:
         if not self.tree: return Result.fail("No file loaded.")
         with self.transaction():
             ok, nodes = self._safe_xpath(xpath)
-            if not ok:
-                return Result.fail(nodes)  # nodes contains error message
-            if not nodes:
-                return Result.fail("No match found.")
+            if not ok: return Result.fail(nodes)
+            if not nodes: return Result.fail("No match found.")
             
             if delete:
                 for n in nodes: n.getparent().remove(n)
@@ -224,38 +169,27 @@ class ManifestRepository:
             
             for n in nodes:
                 if spec.text is not None: n.text = Validator.sanitize(spec.text)
-                for k, v in spec.to_xml_attrs().items(): n.set(k, v)
+                if spec.topic is not None: n.set("topic", spec.topic)
+                if spec.status is not None: n.set("status", str(spec.status))
+                for k, v in spec.attrs.items(): n.set(k, v)
             self.modified = True
             return Result.ok(f"Updated {len(nodes)} nodes.")
 
     def wrap_content(self, new_root_tag: str) -> Result:
-        """
-        NEW FEATURE: Reparents all current top-level nodes under a new container tag.
-        """
         if not self.tree: return Result.fail("No file loaded.")
         with self.transaction():
             Validator.validate_tag(new_root_tag)
-            
-            # 1. Identify current top-level children
             children = list(self.root)
-            if not children:
-                return Result.fail("Manifest is empty; nothing to wrap.")
-
-            # 2. Create the new wrapper element
+            if not children: return Result.fail("Manifest is empty; nothing to wrap.")
             wrapper = etree.Element(new_root_tag)
-
-            # 3. Move children into wrapper
             for child in children:
                 self.root.remove(child)
                 wrapper.append(child)
-
-            # 4. Append wrapper to main root
             self.root.append(wrapper)
             self.modified = True
             return Result.ok(f"Wrapped {len(children)} items under <{new_root_tag}>.")
 
     def merge_from(self, path: str, password: str = None) -> Result:
-        """Merges external file content into current root."""
         if not self.tree: return Result.fail("No active manifest.")
         try:
             raw = self.storage.load(path, password)
@@ -288,23 +222,30 @@ class ManifestView:
     def _tree(nodes) -> str:
         lines = []
         def _recurse(node, level, is_root_item):
-            tag, topic = node.tag, node.get("topic", "")
-            text, status = (node.text or "").strip(), node.get("status")
+            tag = node.tag
+            topic = node.get("topic", "")
+            text = (node.text or "").strip()
+            status = node.get("status")
             
-            # Headers
-            if is_root_item:
-                lines.append(f"\n## {topic if topic else tag.upper()}")
-                if not text and not status:
-                    for c in node: _recurse(c, level + 1, False)
-                    return
+            display_tag = f"<{tag}>"
+            
+            if topic:
+                content = f"{display_tag} **{topic}**"
+            else:
+                content = display_tag
+            
+            if text: content += f": {text}"
+            
+            # Header View
+            if is_root_item and not text and not status:
+                lines.append(f"\n## {content.replace('**', '')}")
+                for c in node: _recurse(c, level + 1, False)
+                return
 
-            # Items
+            # Item View
             indent = "  " * level
             mark = "[x]" if status == "done" else ("[ ]" if status else "-")
             stat_str = f"({status}) " if status and status != "done" else ""
-            
-            content = f"**{topic}**" if topic else f"<{tag}>"
-            if text: content += f": {text}"
             
             ignore = {'topic', 'status'}
             attrs = [f"{k}={v}" for k,v in node.attrib.items() if k not in ignore]
@@ -325,14 +266,23 @@ class ManifestView:
             rows.append({
                 "Tag": n.tag, 
                 "Topic": ("  "*d) + (n.get("topic") or ""), 
-                "Status": n.get("status") or "-"
+                "Status": n.get("status") or "-",
+                "Text": (n.text or "").strip()
             })
             for c in n: _flat(c, d+1)
         for n in nodes: _flat(n, 0)
         
-        cols = ["Topic", "Tag", "Status"]
-        widths = {c: max(len(c), max((len(r[c]) for r in rows), default=0)) for c in cols}
-        fmt = " | ".join(f"{{:<{widths[c]}}}" for c in cols)
+        # Define columns and their order
+        cols = ["Topic", "Tag", "Status", "Text"]
         
-        return "\n".join([fmt.format(**{c:c for c in cols}), "-"*sum(widths.values()), 
-                          *[fmt.format(**r) for r in rows]])
+        # Calculate dynamic widths
+        widths = {c: max(len(c), max((len(r[c]) for r in rows), default=0)) for c in cols}
+        
+        # Use named placeholders {Topic} instead of positional {}
+        fmt = " | ".join(f"{{{c}:<{widths[c]}}}" for c in cols)
+        
+        header = fmt.format(**{c:c for c in cols})
+        separator = "-+-".join("-" * widths[c] for c in cols)
+        body = [fmt.format(**r) for r in rows]
+        
+        return "\n".join([header, separator] + body)
