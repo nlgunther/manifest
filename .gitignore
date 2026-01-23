@@ -90,6 +90,9 @@ docs/_build/
 # PyBuilder
 target/
 
+# auxiliary files for development environments
+auxiliary/
+
 # IPython Notebook
 .ipynb_checkpoints
 

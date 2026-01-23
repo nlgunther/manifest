@@ -1,72 +1,89 @@
-# Manifest Manager
+# Manifest Manager v3.0
 
-**Manifest Manager** is a production-grade, transactional Command Line Interface (CLI) for managing hierarchical data (tasks, inventories, project plans) stored in standard XML.
+**Manifest Manager** is a professional-grade, transactional Command Line Interface (CLI) for managing hierarchical data structures. It is designed for developers and power users who need a robust tool for task management, project planning, inventories, or complex configuration management without the overhead of a database server.
 
-It adheres to the **MVC (Model-View-Controller)** design pattern and ensures data integrity through **atomic transactions**—if an operation fails (e.g., due to a typo), the entire change is rolled back instantly.
+It persists data in standard **XML** for portability but adds a layer of safety, encryption, and convenience found in modern applications.
 
-## 🚀 Features
+## 🚀 Key Features
 
-* **Transactional Safety:** All edits are atomic. Your data never gets left in a broken state.
-* **WYSIWYG Viewing:** The Tree View shows your data exactly as it is stored (case-sensitive).
-* **Flexible Search:** Uses standard XPath 1.0 for powerful filtering.
-* **Custom Attributes:** Add any key-value pair to any node on the fly.
-* **Zero Database:** Stores everything in a portable, human-readable `.xml` file.
+### 🛡️ Robust & Safe
 
-## 📦 Installation
+* **Atomic Transactions:** Every modification (add, edit, wrap, merge) is wrapped in a transaction. If a command fails or invalidates the schema, the state rolls back instantly. Your data never gets corrupted.
+* **Path & Tag Validation:** Rigorous sanitization prevents path injection attacks and ensures generated XML is valid.
+* **Zero-Knowledge Encryption:** Native support for **AES-256** encrypted archives (`.7z`). Passwords are never stored on disk.
 
-### Prerequisites
+### ⚡ Powerful Editing
 
-* Python 3.8+
-* `lxml` library
+* **Batch Editing:** Use XPath to target multiple nodes at once (e.g., mark all "pending" tasks as "active").
+* **Surgical Updates:** specific flags (`--text`, `--topic`, `--status`) let you modify just what you need without rewriting the whole node.
 
-### Setup
+### 🔗 Merge Capabilities
 
-1. Clone or download this repository.
+* **Import External Data:** Merge nodes from other files into your workspace.
+* **Non-Destructive:** The merge strategy is **append-only**. No existing data is ever overwritten or deleted during a merge.
 
-2. Install in "editable" mode (recommended):
-   
-   ```bash
-   pip install -e .
-   ```
+---
 
-3. Run the tool:
-   
-   ```bash
-   manifest
-   ```
+## 🏃‍♂️ Quick Start Guide
 
-## ⚡ Quick Start
+Once inside the `(manifest)` shell:
 
-1. **Start the Shell**
-   
-   ```bash
-   manifest
-   ```
-
-2. **Load/Create a File**
+1. **Create a New File**
    
    ```text
-   (manifest) load my_todo
+   (manifest) load my_project
    ```
-   
-   *Creates `my_todo.xml` if it doesn't exist.*
 
-3. **Add Data**
+2. **Add Data**
    
    ```text
-   (my_todo.xml) add --tag project --topic "Garage Cleanup"
-   (my_todo.xml) add --tag task --parent "//*[@topic='Garage Cleanup']" --status active "Buy shelving"
+   (my_project.xml) add --tag project --topic "Website Redesign"
+   (my_project.xml) add --tag task --parent "//project" --status active "Design Mockups"
    ```
 
-4. **View Data**
+3. **Edit Data**
+   
+   * *Update Status:*
+     
+     ```text
+     (my_project.xml) edit --xpath "//task[@status='active']" --status done
+     ```
+   * *Change Text:*
+     
+     ```text
+     (my_project.xml) edit --xpath "//project" --topic "Global Redesign 2026"
+     ```
+   * *Delete Items:*
+     
+     ```text
+     (my_project.xml) edit --xpath "//task[@status='cancelled']" --delete
+     ```
+
+4. **View Your Data**
    
    ```text
-   (my_todo.xml) list
+   (my_project.xml) list
    ```
 
-## 🧪 Development
+5. **Secure & Save**
+   
+   ```text
+   (my_project.xml) save secret_plans.7z
+   Enter password for secret_plans.7z: *******
+   ```
 
-To run the test suite (requires `pytest`):
+---
 
-```bash
-pytest tests
+## 🤝 Merge Conventions
+
+The `merge` command (`merge filename.xml`) follows a **Strict Append Strategy**:
+
+1. **Scope:** It imports all **top-level children** from the source file's root.
+2. **No Overwriting:** Existing nodes in your current file are **never** modified, replaced, or deleted.
+3. **Duplicates:** Because it is an append operation, if the source file contains data identical to your current file, you will end up with duplicates.
+   * *Recommendation:* Use `wrap` before merging to isolate imported data into its own container (e.g., `wrap --root existing_data` -> `merge new_data.xml`).
+
+---
+
+**License:** MIT
+**Version:** 3.0.0
