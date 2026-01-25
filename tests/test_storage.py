@@ -35,8 +35,8 @@ class TestFlatFileOperations:
 
 class TestPathValidation:
     def test_null_byte_rejected(self, storage):
-        """Fixed: Regex now matches 'Null byte' capitalization."""
-        with pytest.raises(ValueError, match="Null byte"):
+        """Test that null bytes in path are rejected (injection attack prevention)."""
+        with pytest.raises(ValueError, match="null byte"):
             storage.load("file\x00.xml")
     
     def test_empty_path_rejected(self, storage):
@@ -44,8 +44,8 @@ class TestPathValidation:
             storage.load("")
 
     def test_control_characters_rejected(self, storage):
-        """This should now pass with storage.py v2.6.2"""
-        with pytest.raises(ValueError, match="control character"):
+        """Test that control characters are rejected."""
+        with pytest.raises(ValueError, match="invalid control character"):
             storage.load("file\x01.xml")
             
     def test_normal_path_accepted(self, storage, temp_dir):

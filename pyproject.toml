@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "manifest-manager"
-version = "3.0.0"
+version = "3.4.0"
 description = "A transactional CLI for hierarchical data management."
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "lxml",
-    "py7zr"
+    "py7zr",
+    "pyyaml"  # NEW for v3.3
 ]
 authors = [
   {name = "Your Name", email = "you@example.com"}
@@ -22,4 +23,4 @@ manifest = "manifest:main"
 
 # CRITICAL: Explicitly list your modules since they are in the root
 [tool.setuptools]
-py-modules = ["manifest", "manifest_core", "storage"]
+py-modules = ["manifest", "manifest_core", "storage", "config", "id_sidecar"]  # ADD these 2

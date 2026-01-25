@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Manifest Manager CLI
-====================
+Manifest Manager CLI v3.4
+==========================
 
 Interactive shell for hierarchical XML data management.
 Supports plain XML and encrypted 7z archives.
@@ -10,19 +10,26 @@ Usage:
     python manifest.py
     
 Commands:
-    load, save, add, edit, list, wrap, merge, cheatsheet, exit
+    load, save, add, edit, list, find, wrap, merge, autoid, rebuild, cheatsheet, exit
 
 Example Session:
-    (manifest) load myproject
+    (manifest) load myproject --autosc
     (myproject.xml) add --tag task --topic "New feature"
-    (myproject.xml) list //task
+    (myproject.xml) find a3f
+    (myproject.xml) edit a3f --status done        # v3.4: ID prefix matching!
+    (myproject.xml) rebuild                       # v3.4: Sync sidecar
     (myproject.xml) save backup.7z
 
 Features:
     - XPath-based querying with CSS selector support
+    - Fast ID lookups via sidecar index (O(1))
+    - Smart edit: auto-detects ID vs XPath
+    - ID prefix matching with interactive selection (v3.4)
+    - In-memory sidecar rebuild command (v3.4)
     - Encrypted backups via 7z with password protection
     - Transaction support with automatic rollback on errors
     - Multiple view formats (tree, table)
+    - Configuration files for customization
     - Merge multiple manifest files
     - Wrap top-level nodes under new containers
 
@@ -48,42 +55,98 @@ except ImportError as e:
     print(f"Critical Error: Missing core modules. {e}")
     sys.exit(1)
 
+
+# --- Helper Functions for v3.3 ---
+
+def _is_id_selector(selector: str, repo) -> bool:
+    """Detect if selector is an ID or XPath.
+    
+    Detection heuristics:
+        1. 8-char hex string → ID (our auto-generated format)
+        2. Contains XPath syntax (/, [, @, *) → XPath
+        3. Exists in sidecar → ID
+        4. Default → XPath (safe fallback)
+    
+    Args:
+        selector: User-provided selector string
+        repo: Repository to check sidecar
+        
+    Returns:
+        True if selector is likely an ID, False if XPath
+        
+    Examples:
+        >>> _is_id_selector('a3f7b2c1', repo)
+        True  # 8-char hex
+        >>> _is_id_selector('//task[@status="active"]', repo)
+        False  # Has XPath syntax
+    """
+    # 8-char hex (our auto-generated format)
+    if len(selector) == 8 and all(c in '0123456789abcdef' for c in selector):
+        return True
+    
+    # XPath syntax indicators
+    if any(c in selector for c in ['/', '[', '@', '*', '=']):
+        return False
+    
+    # Check sidecar (definitive proof)
+    if repo.id_sidecar and repo.id_sidecar.exists(selector):
+        return True
+    
+    # Default to XPath for safety (backward compatible)
+    return False
+
+
 # =============================================================================
 # COMPREHENSIVE CHEATSHEET
 # =============================================================================
 
 CHEATSHEET = """
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                        MANIFEST MANAGER v3.0 CHEATSHEET                       ║
+║                      MANIFEST MANAGER v3.4 CHEATSHEET                         ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 FILE OPERATIONS
 ───────────────
   load <file>           Load XML or 7z file (auto-creates if missing)
+  load <file> --autosc  Load and auto-create ID sidecar if missing
   save [file]           Save to current or new file
   merge <file>          Import all nodes from another manifest
 
 NODE OPERATIONS
 ───────────────
-  add --tag <name>      Create new node
+  add --tag <n>      Create new node
       --parent <xpath>  Where to add (default: /* = root's children)
       --topic "text"    Set topic attribute  
       --status <s>      Set status: active|done|pending|blocked|cancelled
+      --id <value>      Custom ID (or 'False' to disable auto-ID)
       -a key=value      Custom attribute (repeatable)
       "body text"       Text content of node
 
-  edit --xpath <query>  Modify or delete nodes
+  edit <id_or_xpath>    Modify or delete nodes (auto-detects ID vs XPath)
       --text "new"      Update text content
       --topic "new"     Update topic attribute
       --status <s>      Update status
       -a key=value      Add/update attribute
       --delete          Remove matching nodes
+      --id              Force ID interpretation
+      --xpath           Force XPath interpretation
 
-VIEWING
-───────
+SEARCHING & VIEWING
+───────────────────
+  find <prefix>         Find by ID prefix (fast sidecar lookup)
+      --tree            Show full subtrees for matches
+      --depth N         Limit tree depth
+
   list [xpath]          Display nodes (default: /* = all top-level)
       --style tree      Hierarchical view (default)
       --style table     Tabular view
+      --depth N         Limit tree depth
+
+  autoid                Add IDs to elements that lack them
+      --overwrite       Replace ALL existing IDs
+
+  rebuild               Rebuild ID sidecar from current XML (v3.4 NEW!)
+                        Use when IDs exist but sidecar is out of sync
 
 STRUCTURE
 ─────────
@@ -102,6 +165,42 @@ XPATH QUICK REFERENCE
   //task[last()]        Last task element
   //task[contains(@topic,'bug')]  Tasks with 'bug' in topic
 
+v3.3 NEW FEATURES
+─────────────────
+  ID Sidecar:
+    - Fast O(1) ID lookups
+    - Auto-syncs on save
+    - Created with --autosc flag
+
+  Smart Edit:
+    - edit a3f7b2c1 --topic "New"     # By ID (auto-detected)
+    - edit //task --status active      # By XPath (auto-detected)
+    - edit --id BUG-123 --topic "Fix"  # Custom ID (explicit)
+
+  Prominent IDs:
+    - find command shows IDs first
+    - Easy copy/paste workflow
+
+  Configuration:
+    - Per-file: myfile.xml.config
+    - Global: ~/.config/manifest/config.yaml
+
+v3.4 NEW FEATURES
+─────────────────
+  ID Prefix Matching in Edit:
+    - edit a3f --delete               # Matches all IDs starting with 'a3f'
+    - Interactive selection if multiple matches
+    - Single match: applies automatically
+
+  Rebuild Command:
+    - rebuild                         # Sync sidecar with current XML
+    - Fixes "ID not found" errors
+    - No need to exit and reload
+
+  DRY Architecture:
+    - find and edit share same ID search logic
+    - Consistent behavior across commands
+
 STATUS VALUES
 ─────────────
   active                In progress
@@ -112,16 +211,23 @@ STATUS VALUES
 
 COMMON WORKFLOWS
 ────────────────
-  Daily Task Management:
-    1. load tasks.xml
+  Quick Task Management with IDs (v3.4):
+    1. load tasks.xml --autosc
     2. add --tag task --status active "Today's work"
-    3. list //task[@status='active']
-    4. edit --xpath "//task[1]" --status done
+    3. find a3f                        # Find by prefix
+    4. edit a3f --status done          # Edit by prefix (auto-selects if unique)
     5. save
+  
+  Fix "ID not found" errors (v3.4):
+    1. load old_file.xml               # File has IDs but no sidecar
+    2. list                            # See IDs in output
+    3. edit a3f --delete               # Error: ID not found
+    4. rebuild                         # Sync sidecar with XML
+    5. edit a3f --delete               # Success!
   
   Weekly Archive:
     1. load weekly.xml
-    2. edit --xpath "//task[@status='done']" --topic "Week-01"
+    2. edit "//task[@status='done']" --topic "Week-01"
     3. wrap --root "archive_2026_w01"
     4. save archive_2026_w01.7z
   
@@ -134,14 +240,21 @@ COMMON WORKFLOWS
 
 EXAMPLES
 ────────
-  # Start new project
-  load myproject
+  # Start new project with sidecar
+  load myproject --autosc
   add --tag project --topic "Q1 Planning"
   add --tag task --parent "//project" --status active "Define roadmap"
   save
 
-  # Complete a task  
-  edit --xpath "//task[contains(text(),'roadmap')]" --status done
+  # Edit by ID prefix (v3.4)
+  find def                             # Find IDs starting with 'def'
+  edit def --status done               # Auto-selects if unique, prompts if multiple
+
+  # Edit by exact ID
+  edit def456ab --status done
+
+  # Edit by XPath (still works!)
+  edit "//task[contains(text(),'roadmap')]" --status done
 
   # Create encrypted backup
   save archive.7z
@@ -151,19 +264,25 @@ EXAMPLES
   wrap --root archive
   save
 
-  # Merge files
-  load main.xml  
-  merge imported.xml
-  save
+  # Fix sidecar issues (v3.4)
+  load myfile.xml                      # Old file with IDs but no sidecar
+  rebuild                              # Sync sidecar
+  edit a3f --delete                    # Now works!
 
 TIPS
 ────
+  • NEW v3.4: Use 'rebuild' command to fix "ID not found" errors
+  • NEW v3.4: Edit by ID prefix - no need to type full ID!
+  • IDs shown first in find results for easy copy/paste
+  • Use ID prefixes: 'edit a3f' instead of 'edit a3f7b2c1'
+  • Multiple matches? Edit will prompt you to select
   • XPath is case-sensitive: //Task ≠ //task
   • Use quotes around text with spaces: --topic "My Topic"
   • Tab completion works for commands
   • Ctrl+D or 'exit' to quit (warns if unsaved changes)
   • Maximum 3 password attempts for encrypted files
   • Tags cannot start with 'xml' (any case) - XML specification
+  • Config files: see DOCUMENTATION_v3.4.md for full guide
 """
 
 class ParserControl(Exception): pass
@@ -179,7 +298,7 @@ class SafeParser(argparse.ArgumentParser):
         raise ParserControl()
 
 class ManifestShell(cmd.Cmd):
-    intro = "Manifest Manager v3.0. Type 'help' or 'cheatsheet' for commands."
+    intro = "Manifest Manager v3.4. Type 'help' or 'cheatsheet' for commands."
     prompt = "(manifest) "
 
     def __init__(self):
@@ -263,13 +382,38 @@ class ManifestShell(cmd.Cmd):
     # --- Commands ---
 
     def do_load(self, arg):
-        """Load a file: load <filename>"""
-        if not arg: return print("Usage: load <filename>")
+        """Load manifest: load <file> [--auto-sidecar] [--rebuild-sidecar]
         
-        def on_success(result):
-            self.prompt = f"({os.path.basename(self.repo.filepath)}) "
+        Examples:
+            load myfile.xml
+            load myfile.xml --autosc          # Create sidecar if missing
+            load myfile.xml --rebuildsc       # Force rebuild sidecar
+        """
+        p = SafeParser(prog="load")
+        p.add_argument("filename")
+        p.add_argument("--auto-sidecar", "--autosc", action="store_true",
+                       help="Auto-create sidecar if missing")
+        p.add_argument("--rebuild-sidecar", "--rebuildsc", action="store_true",
+                       help="Force rebuild sidecar")
         
-        self._with_password_retry(self.repo.load, arg, on_success)
+        def _run():
+            args = p.parse_args(shlex.split(arg))
+            
+            def on_success(result):
+                self.prompt = f"({os.path.basename(self.repo.filepath)}) "
+            
+            # Call load with sidecar flags
+            def load_with_flags(filepath, password):
+                return self.repo.load(
+                    filepath,
+                    password,
+                    auto_sidecar=args.auto_sidecar,
+                    rebuild_sidecar=args.rebuild_sidecar
+                )
+            
+            self._with_password_retry(load_with_flags, args.filename, on_success)
+        
+        self._exec(_run)
 
     def do_save(self, arg):
         """Save file: save [filename]"""
@@ -279,20 +423,36 @@ class ManifestShell(cmd.Cmd):
         print(self.repo.save(arg, pwd).message)
 
     def do_add(self, arg):
-        """Add node: add --tag task "Desc" """
+        """Add node: add --tag task "Desc"
+        
+        Options:
+          --id <value>     Custom ID (default: auto-generated 8-char hex)
+          --id False       Disable auto-ID generation
+        """
         p = SafeParser(prog="add", description="Add node")
         p.add_argument("--tag", required=True, help="Tag name")
         p.add_argument("--parent", default="/*", help="Parent XPath")
         p.add_argument("--topic", help="Topic/Title")
         p.add_argument("--status", help="Status")
+        p.add_argument("--id", dest="node_id", help="ID (or 'False' to disable auto-ID)")
         p.add_argument("-a", "--attr", action="append", help="k=v attrs")
         p.add_argument("text", nargs="?", help="Body text")
 
         def _run():
             args = p.parse_args(shlex.split(arg))
             attrs = self._parse_attrs(args.attr)
+            
+            # Handle --id parameter
+            auto_id = True
+            if args.node_id:
+                if args.node_id.lower() in ('false', 'no', 'off', '0'):
+                    auto_id = False  # Explicitly disable
+                else:
+                    attrs['id'] = args.node_id  # Custom ID
+                    auto_id = False  # Don't auto-generate if custom provided
+            
             spec = NodeSpec(args.tag, args.topic, args.status, args.text, attrs)
-            print(self.repo.add_node(args.parent, spec).message)
+            print(self.repo.add_node(args.parent, spec, auto_id=auto_id).message)
         self._exec(_run)
 
     def do_wrap(self, arg):
@@ -313,30 +473,293 @@ class ManifestShell(cmd.Cmd):
         if not arg: return print("Usage: merge <filename>")
         self._with_password_retry(self.repo.merge_from, arg)
 
-    def do_list(self, arg):
-        """View data: list [xpath] [--style tree|table]"""
-        p = SafeParser(prog="list")
-        p.add_argument("xpath", nargs="?", default="/*")
-        p.add_argument("--style", default="tree", choices=["tree", "table"])
+    def do_find(self, arg):
+        """Find nodes by ID prefix: find <prefix> [--tree] [--depth N]
+        
+        Examples:
+          find a3f              # Find IDs starting with 'a3f' (flat view)
+          find a3f --tree       # Show full subtrees
+          find a3f --tree --depth 2  # Limit depth
+        """
+        p = SafeParser(prog="find")
+        p.add_argument("prefix", help="ID prefix to search")
+        p.add_argument("--tree", action="store_true", help="Show tree view")
+        p.add_argument("--depth", type=int, help="Limit tree depth")
         
         def _run():
             args = p.parse_args(shlex.split(arg))
-            print(ManifestView.render(self.repo.search(args.xpath), args.style))
+            
+            # Use DRY helper for ID search
+            matches = self._search_by_id_pattern(self.repo, args.prefix)
+            
+            if not matches:
+                print(f"No IDs found matching '{args.prefix}'")
+                return
+            
+            print(f"\nFound {len(matches)} match(es)")
+            
+            if args.tree:
+                # Tree view - show full subtrees
+                for i, elem in enumerate(matches, 1):
+                    if i > 1:
+                        print("\n" + "─" * 60)
+                    print(f"Match {i}: {self._build_xpath(elem)}")
+                    print("─" * 60)
+                    print(ManifestView.render([elem], "tree", max_depth=args.depth))
+            else:
+                # Flat view - show IDs prominently (v3.3)
+                for elem in matches:
+                    # Build XPath
+                    xpath = self._build_xpath(elem)
+                    
+                    # Display with ID first and prominent
+                    elem_id = elem.get("id", "")
+                    topic = elem.get("topic", "")
+                    status = elem.get("status", "")
+                    
+                    print()  # Blank line before each result
+                    if elem_id:
+                        print(f"  ID: {elem_id}")  # ID first, easy to copy
+                    print(f"     Path: {xpath}")
+                    if topic:
+                        print(f"     Topic: {topic}")
+                    if status:
+                        print(f"     Status: {status}")
+        
+        self._exec(_run)
+
+    @staticmethod
+    def _build_xpath(elem) -> str:
+        """Build XPath for an element."""
+        path_parts = []
+        current = elem
+        while current is not None and current.tag != "manifest":
+            tag = current.tag
+            elem_id = current.get("id", "")
+            if elem_id:
+                tag = f"{tag}[@id='{elem_id}']"
+            path_parts.insert(0, tag)
+            current = current.getparent()
+        
+        return "/" + "/".join(path_parts) if path_parts else f"/{elem.tag}"
+    
+    @staticmethod
+    def _search_by_id_pattern(repo, pattern: str) -> list:
+        """Search for IDs matching pattern (prefix match).
+        
+        DRY helper used by both find and edit commands.
+        
+        Args:
+            repo: Repository instance
+            pattern: ID prefix to match
+            
+        Returns:
+            List of matching elements
+            
+        Examples:
+            >>> _search_by_id_pattern(repo, 'a3f')
+            [<Element task>, <Element note>]  # All IDs starting with 'a3f'
+        """
+        if not repo.id_sidecar:
+            return []
+        
+        # Find all IDs matching the prefix
+        matching_ids = [
+            elem_id for elem_id in repo.id_sidecar.all_ids() 
+            if elem_id.startswith(pattern)
+        ]
+        
+        # Get elements for matching IDs
+        elements = []
+        for elem_id in matching_ids:
+            xpath = repo.id_sidecar.get(elem_id)
+            if xpath:
+                try:
+                    matches = repo.root.xpath(xpath)
+                    if matches:
+                        elements.append(matches[0])
+                except:
+                    pass  # Skip invalid XPaths
+        
+        return elements
+
+    def do_autoid(self, arg):
+        """Auto-generate IDs for elements that lack them.
+        
+        Usage: 
+          autoid              # Add IDs to elements without them
+          autoid --overwrite  # Replace ALL IDs with new ones
+        
+        Examples:
+          autoid              # Safe: only adds missing IDs
+          autoid --overwrite  # Caution: replaces existing IDs
+        """
+        p = SafeParser(prog="autoid", description="Add IDs to elements")
+        p.add_argument("--overwrite", action="store_true", 
+                      help="Replace existing IDs (default: skip elements with IDs)")
+        
+        def _run():
+            args = p.parse_args(shlex.split(arg))
+            result = self.repo.ensure_ids(overwrite=args.overwrite)
+            print(result.message)
+            if result.success and not args.overwrite:
+                print("Tip: Use 'autoid --overwrite' to replace existing IDs")
+        self._exec(_run)
+
+    def do_rebuild(self, arg):
+        """Rebuild ID sidecar from current XML (NEW in v3.4).
+        
+        Use this when:
+          - IDs exist in XML but sidecar is missing/outdated
+          - After loading old files without --autosc
+          - "ID not found" errors for IDs that exist
+        
+        Usage:
+          rebuild             # Rebuild sidecar from memory
+        
+        Examples:
+          (manifest) load old_file.xml
+          (old_file.xml) list
+          # You see IDs in output
+          (old_file.xml) edit a3f --delete
+          # Error: ID not found
+          (old_file.xml) rebuild
+          # ✓ Rebuilt sidecar with 47 IDs
+          (old_file.xml) edit a3f --delete
+          # Success!
+        """
+        if not self.repo.tree:
+            return print("Error: No file loaded.")
+        
+        if not self.repo.id_sidecar:
+            print("Error: Sidecar not enabled.")
+            print("Tip: Exit and reload with --autosc flag:")
+            print(f"     load \"{self.repo.filepath}\" --autosc")
+            return
+        
+        print("Rebuilding sidecar from current XML...")
+        self.repo.id_sidecar.rebuild(self.repo.root)
+        self.repo.id_sidecar.save()
+        
+        count = len(self.repo.id_sidecar.index)
+        print(f"✓ Rebuilt sidecar with {count} ID(s)")
+        
+        if count == 0:
+            print("Tip: Use 'autoid' to add IDs to elements")
+
+    def do_list(self, arg):
+        """View data: list [xpath] [--style tree|table] [--depth N]"""
+        p = SafeParser(prog="list")
+        p.add_argument("xpath", nargs="?", default="/*")
+        p.add_argument("--style", default="tree", choices=["tree", "table"])
+        p.add_argument("--depth", type=int, help="Limit tree depth")
+        
+        def _run():
+            args = p.parse_args(shlex.split(arg))
+            print(ManifestView.render(
+                self.repo.search(args.xpath), 
+                args.style, 
+                max_depth=args.depth
+            ))
         self._exec(_run)
 
     def do_edit(self, arg):
-        """Edit/Delete: edit --xpath <query> [options]"""
+        """Edit/Delete: edit <id_or_xpath> [options]
+        
+        Smart detection:
+            - 8-char hex (e.g., 'a3f7b2c1') → Exact ID match
+            - Shorter hex (e.g., 'a3f') → ID prefix search (interactive if multiple)
+            - XPath syntax (e.g., '//task') → XPath query
+            - Use --xpath to force XPath, --id to force ID
+        
+        Examples:
+            edit a3f7b2c1 --topic "Updated"           # By exact ID
+            edit a3f --topic "Updated"                # By prefix (interactive if multiple)
+            edit --id BUG-123 --topic "Fixed"         # By ID (explicit)
+            edit "//task[@status='pending']" --status active  # By XPath
+        """
         p = SafeParser(prog="edit")
-        p.add_argument("--xpath", required=True)
-        p.add_argument("--text"); p.add_argument("--status")
-        p.add_argument("--topic"); p.add_argument("--delete", action="store_true")
-        p.add_argument("-a", "--attr", action="append")
-
+        p.add_argument("selector", help="Element ID/prefix or XPath")
+        p.add_argument("--xpath", dest="force_xpath", action="store_true",
+                       help="Force XPath interpretation")
+        p.add_argument("--id", dest="force_id", action="store_true",
+                       help="Force ID interpretation")
+        p.add_argument("--topic", help="New topic")
+        p.add_argument("--status", help="New status")
+        p.add_argument("--text", help="New body text")
+        p.add_argument("-a", "--attr", action="append", help="k=v attributes")
+        p.add_argument("--delete", action="store_true", help="Delete node")
+        
         def _run():
             args = p.parse_args(shlex.split(arg))
+            
+            # Build NodeSpec
             attrs = self._parse_attrs(args.attr)
             spec = NodeSpec("ignored", args.topic, args.status, args.text, attrs)
-            print(self.repo.edit_node(args.xpath, spec, args.delete).message)
+            
+            # Determine if selector is ID or XPath
+            if args.force_id:
+                is_id = True
+            elif args.force_xpath:
+                is_id = False
+            else:
+                is_id = _is_id_selector(args.selector, self.repo)
+            
+            # Execute edit
+            if is_id:
+                # ID mode - try exact match first, then prefix
+                if self.repo.id_sidecar and self.repo.id_sidecar.exists(args.selector):
+                    # Exact ID match
+                    result = self.repo.edit_node_by_id(args.selector, spec, args.delete)
+                    print(result.message)
+                else:
+                    # Try prefix match (NEW in v3.4)
+                    matches = self._search_by_id_pattern(self.repo, args.selector)
+                    
+                    if len(matches) == 0:
+                        print(f"Error: No IDs found matching '{args.selector}'")
+                        if self.repo.id_sidecar:
+                            print("Tip: Use 'find <prefix>' to search, or 'rebuild' to sync sidecar")
+                        else:
+                            print("Tip: Load with --autosc to enable ID search")
+                    elif len(matches) == 1:
+                        # Single match - use it automatically
+                        elem_id = matches[0].get('id')
+                        print(f"Matched ID: {elem_id}")
+                        result = self.repo.edit_node_by_id(elem_id, spec, args.delete)
+                        print(result.message)
+                    else:
+                        # Multiple matches - interactive selection (NEW in v3.4)
+                        print(f"\nMultiple IDs match '{args.selector}':")
+                        for i, elem in enumerate(matches, 1):
+                            elem_id = elem.get('id')
+                            topic = elem.get('topic', '(no topic)')
+                            status = elem.get('status', '')
+                            status_str = f" [{status}]" if status else ""
+                            print(f"  [{i}] {elem_id}{status_str} - {topic}")
+                        
+                        try:
+                            choice = input(f"\nSelect [1-{len(matches)}] or 'c' to cancel: ").strip()
+                            if choice.lower() == 'c':
+                                print("Cancelled.")
+                                return
+                            
+                            idx = int(choice) - 1
+                            if idx < 0 or idx >= len(matches):
+                                print("Invalid selection.")
+                                return
+                            
+                            elem_id = matches[idx].get('id')
+                            result = self.repo.edit_node_by_id(elem_id, spec, args.delete)
+                            print(result.message)
+                        except (ValueError, KeyboardInterrupt):
+                            print("\nCancelled.")
+                            return
+            else:
+                # XPath mode
+                result = self.repo.edit_node(args.selector, spec, args.delete)
+                print(result.message)
+        
         self._exec(_run)
 
     def do_cheatsheet(self, _):
@@ -351,13 +774,14 @@ class ManifestShell(cmd.Cmd):
         return True
     def do_EOF(self, _): return self.do_exit(_)
 
-# ... (rest of the file remains the same)
 
 def main():
-    try: 
+    """Entry point for pip-installed command."""
+    try:
         ManifestShell().cmdloop()
-    except KeyboardInterrupt: 
+    except KeyboardInterrupt:
         print("\nInterrupted.")
+
 
 if __name__ == "__main__":
     main()
