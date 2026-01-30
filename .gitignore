@@ -3,14 +3,23 @@
 *patch*
 *temp*
 *~backup*
+~*
+.~*
+#build*
 
 # old Knowledge_Transfer files
 knowledge_transfers/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
+*cache
 *.py[cod]
 *$py.class
+
+# Python extras
+auxiliary/
+examples/
+*egg*/
 
 # C extensions
 *.so
@@ -33,7 +42,6 @@ var/
 .installed.cfg
 *.egg
 ../*
-stores/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -66,12 +74,20 @@ coverage.xml
 *.docx
 *.xlsx
 *.pptx
+*.csv
+*.json
 
 # Other files
 *.log
 *.sqlite3
 *.db
 *.xml
+*.txt
+*.png
+*.md
+*.npz
+*.html
+*.ics
 
 # Django stuff:
 *.log
@@ -89,9 +105,6 @@ docs/_build/
 
 # PyBuilder
 target/
-
-# auxiliary files for development environments
-auxiliary/
 
 # IPython Notebook
 .ipynb_checkpoints
@@ -125,3 +138,4 @@ ENV/
 *.tar.bz2
 *.tgz
 *.xz
+*.tar

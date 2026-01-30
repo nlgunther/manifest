@@ -21,13 +21,40 @@ class StorageManager:
 
     @staticmethod
     def _validate_path(filepath: str) -> str:
-        if not filepath or not filepath.strip(): raise ValueError("Empty file path")
-        if '\x00' in filepath: raise ValueError("Null byte in path")
+        """Validate file path for security.
+        
+        Args:
+            filepath: Path to validate
+            
+        Returns:
+            Normalized path
+            
+        Raises:
+            ValueError: If path contains dangerous patterns
+        """
+        if not filepath or not filepath.strip(): 
+            raise ValueError("Empty file path")
+        if '\x00' in filepath: 
+            raise ValueError("null byte in path")
         if any(ord(c) < 32 for c in filepath if c not in '\t\n'):
-            raise ValueError("Invalid control characters in path")
+            raise ValueError("invalid control characters in path")
         return os.path.normpath(filepath)
 
     def load(self, filepath: str, password: Optional[str] = None) -> bytes:
+        """Load file contents. Supports plain XML and encrypted .7z archives.
+        
+        Args:
+            filepath: Path to file (absolute or relative)
+            password: Optional password for encrypted archives
+            
+        Returns:
+            Raw file contents as bytes
+            
+        Raises:
+            FileNotFoundError: File doesn't exist
+            PasswordRequired: Encrypted file needs password
+            StorageError: I/O or decompression error
+        """
         filepath = self._validate_path(filepath)
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"File not found: {filepath}")
@@ -36,6 +63,16 @@ class StorageManager:
         return self._load_flat(filepath)
 
     def save(self, filepath: str, data: bytes, password: Optional[str] = None) -> None:
+        """Write file contents. Supports plain XML and encrypted .7z archives.
+        
+        Args:
+            filepath: Path to file (absolute or relative)
+            data: Raw bytes to write
+            password: Optional password for .7z encryption
+            
+        Raises:
+            StorageError: Write failure
+        """
         filepath = self._validate_path(filepath)
         if filepath.lower().endswith(".7z"):
             self._save_7z(filepath, data, password)
@@ -74,10 +111,13 @@ class StorageManager:
         except (lzma.LZMAError, py7zr.exceptions.Bad7zFile):
             # This catches "Corrupt input data" which often means wrong password
             raise PasswordRequired("Invalid password (or corrupt file).")
+        except py7zr.exceptions.CrcError:
+            # CRC errors typically mean wrong password for encrypted archives
+            raise PasswordRequired("Invalid password (CRC check failed).")
         except Exception as e:
             # Fallback for generic exceptions with specific messages
             msg = str(e).lower()
-            if "password" in msg or "corrupt input data" in msg: 
+            if "password" in msg or "corrupt input data" in msg or "crc" in msg: 
                 raise PasswordRequired("Invalid password.")
             raise StorageError(f"7-Zip Error: {e}")
 
@@ -90,7 +130,8 @@ class StorageManager:
             try:
                 with py7zr.SevenZipFile(path, mode='r', password=password) as z:
                     if z.getnames(): internal_name = z.getnames()[0]
-            except: pass
+            except (FileNotFoundError, PermissionError, Exception):
+                pass  # Use default name on read failure
 
         try:
             with py7zr.SevenZipFile(path, 'w', password=password) as z:

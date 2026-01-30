@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock, ANY
 from lxml import etree
-from manifest_core import ManifestRepository, NodeSpec, TaskStatus, Result
+from manifest_manager.manifest_core import ManifestRepository, NodeSpec, TaskStatus, Result
 
 # --- Fixtures ---
 
