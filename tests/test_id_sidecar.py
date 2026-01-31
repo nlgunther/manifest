@@ -4,8 +4,8 @@ import os
 import tempfile
 import json
 from lxml import etree
-from config import Config
-from id_sidecar import IDSidecar
+from manifest_manager.config import Config
+from manifest_manager.id_sidecar import IDSidecar
 
 
 @pytest.fixture

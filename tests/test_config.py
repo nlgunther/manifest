@@ -3,7 +3,7 @@ import pytest
 import os
 import tempfile
 import yaml
-from config import Config
+from manifest_manager.config import Config
 
 
 def test_config_defaults():

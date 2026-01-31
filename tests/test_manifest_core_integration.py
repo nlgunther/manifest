@@ -2,7 +2,7 @@
 import pytest
 import tempfile
 import os
-from manifest_core import ManifestRepository, NodeSpec
+from manifest_manager.manifest_core import ManifestRepository, NodeSpec
 
 
 @pytest.fixture

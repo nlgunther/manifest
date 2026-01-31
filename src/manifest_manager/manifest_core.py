@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from contextlib import contextmanager
 from lxml import etree
-from storage import StorageManager, PasswordRequired
+from .storage import StorageManager, PasswordRequired
 
 # --- Logging ---
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -56,18 +56,71 @@ class TaskStatus(str, Enum):
 
 @dataclass
 class NodeSpec:
-    """Data Transfer Object for Node operations."""
+    """Data Transfer Object for Node operations.
+    
+    Attributes:
+        tag: Element tag name
+        topic: Topic/title attribute
+        status: Status attribute (active, done, pending, blocked, cancelled)
+        text: Text content of element
+        resp: Responsible party attribute (NEW in v3.4)
+        due: Due date in YYYY-MM-DD format (NEW in v3.5)
+        attrs: Additional custom attributes (dict)
+    """
     tag: str
     topic: Optional[str] = None
     status: Optional[Union[str, TaskStatus]] = None
     text: Optional[str] = None
+    resp: Optional[str] = None
+    due: Optional[str] = None
     attrs: Dict[str, str] = field(default_factory=dict)
 
     def to_xml_attrs(self) -> Dict[str, str]:
+        """Convert NodeSpec attributes to XML attributes dict."""
         a = self.attrs.copy()
         if self.topic: a['topic'] = self.topic
         if self.status: a['status'] = str(self.status)
+        if self.resp: a['resp'] = self.resp
+        if self.due: a['due'] = self.due
         return a
+    
+    @classmethod
+    def from_args(cls, args, tag=None, attributes=None):
+        """Create NodeSpec from argparse namespace (Factory Method).
+        
+        Simplifies NodeSpec creation from CLI arguments and provides
+        a single source of truth for mapping args to NodeSpec fields.
+        
+        Args:
+            args: Parsed argparse Namespace
+            tag: Override tag name (for edit operations where tag is ignored)
+            attributes: Pre-parsed attributes dict (from _parse_attrs)
+            
+        Returns:
+            NodeSpec instance
+            
+        Examples:
+            # In add command
+            attrs = self._parse_attrs(args.attr)
+            spec = NodeSpec.from_args(args, attributes=attrs)
+            
+            # In edit command (tag is ignored)
+            attrs = self._parse_attrs(args.attr)
+            spec = NodeSpec.from_args(args, tag="ignored", attributes=attrs)
+        
+        Note:
+            Uses getattr() with None default to handle missing attributes.
+            This allows the same factory to work for both add and edit commands.
+        """
+        return cls(
+            tag=tag or getattr(args, 'tag', None),
+            topic=getattr(args, 'topic', None),
+            status=getattr(args, 'status', None),
+            text=getattr(args, 'text', None),
+            resp=getattr(args, 'resp', None),
+            due=getattr(args, 'due', None),
+            attrs=attributes or {}
+        )
 
 @dataclass
 class Result:
@@ -206,8 +259,8 @@ class ManifestRepository:
             self.filepath, self.password, self.modified = path, password, True
             
             # NEW: Initialize config and sidecar for new files too (v3.3)
-            from config import Config
-            from id_sidecar import IDSidecar
+            from .config import Config
+            from .id_sidecar import IDSidecar
             
             self.config = Config(self.filepath)
             
@@ -227,8 +280,8 @@ class ManifestRepository:
             self.filepath, self.password, self.modified = path, password, False
             
             # NEW: Load config and sidecar (v3.3)
-            from config import Config
-            from id_sidecar import IDSidecar
+            from .config import Config
+            from .id_sidecar import IDSidecar
             
             self.config = Config(self.filepath)
             
@@ -253,10 +306,10 @@ class ManifestRepository:
         except PasswordRequired: raise
         except Exception as e: return Result.fail(str(e))
 
-    def save(self, filepath: str = None, new_pass: str = None) -> Result:
+    def save(self, filepath: str = None, password: str = None) -> Result:
         target = (filepath or self.filepath or "").strip('"\'')
         if not target: return Result.fail("No file specified.")
-        pwd = new_pass if new_pass is not None else self.password
+        pwd = password if password is not None else self.password
 
         try:
             xml = etree.tostring(self.root, pretty_print=True, xml_declaration=True, encoding="UTF-8")
@@ -397,7 +450,7 @@ class ManifestRepository:
                 
                 # NEW: Update sidecar with new ID (v3.3)
                 if self.id_sidecar and 'id' in attrs:
-                    from id_sidecar import IDSidecar
+                    from .id_sidecar import IDSidecar
                     xpath = IDSidecar._build_xpath(n)
                     self.id_sidecar.add(attrs['id'], xpath)
             
@@ -528,6 +581,7 @@ class ManifestView:
             
             tag, topic = node.tag, node.get("topic", "")
             text, status = (node.text or "").strip(), node.get("status")
+            resp = node.get("resp", "")
             
             # Headers
             if is_root_item:
@@ -540,15 +594,16 @@ class ManifestView:
             indent = "  " * level
             mark = "[x]" if status == "done" else ("[ ]" if status else "-")
             stat_str = f"({status}) " if status and status != "done" else ""
+            resp_str = f"@{resp} " if resp else ""
             
             content = f"**{topic}**" if topic else f"<{tag}>"
             if text: content += f": {text}"
             
-            ignore = {'topic', 'status'}
+            ignore = {'topic', 'status', 'resp'}
             attrs = [f"{k}={v}" for k,v in node.attrib.items() if k not in ignore]
             if attrs: content += f" [{' '.join(attrs)}]"
 
-            lines.append(f"{indent}{mark} {stat_str}{content}")
+            lines.append(f"{indent}{mark} {stat_str}{resp_str}{content}")
             
             # Recurse into children (with depth tracking)
             for c in node: _recurse(c, level + 1, False, current_depth + 1)
@@ -568,16 +623,18 @@ class ManifestView:
                 return
             
             rows.append({
+                "ID": n.get("id") or "-",
                 "Tag": n.tag, 
                 "Topic": ("  "*d) + (n.get("topic") or ""), 
-                "Status": n.get("status") or "-"
+                "Status": n.get("status") or "-",
+                "Resp": n.get("resp") or "-"
             })
             for c in n: _flat(c, d+1)
         for n in nodes: _flat(n, 0)
         
-        cols = ["Topic", "Tag", "Status"]
+        cols = ["ID", "Topic", "Tag", "Status", "Resp"]
         widths = {c: max(len(c), max((len(r[c]) for r in rows), default=0)) for c in cols}
-        fmt = " | ".join(f"{{:<{widths[c]}}}" for c in cols)
+        fmt = " | ".join(f"{{{c}:<{widths[c]}}}" for c in cols)
         
         return "\n".join([fmt.format(**{c:c for c in cols}), "-"*sum(widths.values()), 
                           *[fmt.format(**r) for r in rows]])

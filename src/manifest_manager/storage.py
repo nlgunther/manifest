@@ -111,10 +111,13 @@ class StorageManager:
         except (lzma.LZMAError, py7zr.exceptions.Bad7zFile):
             # This catches "Corrupt input data" which often means wrong password
             raise PasswordRequired("Invalid password (or corrupt file).")
+        except py7zr.exceptions.CrcError:
+            # CRC errors typically mean wrong password for encrypted archives
+            raise PasswordRequired("Invalid password (CRC check failed).")
         except Exception as e:
             # Fallback for generic exceptions with specific messages
             msg = str(e).lower()
-            if "password" in msg or "corrupt input data" in msg: 
+            if "password" in msg or "corrupt input data" in msg or "crc" in msg: 
                 raise PasswordRequired("Invalid password.")
             raise StorageError(f"7-Zip Error: {e}")
 

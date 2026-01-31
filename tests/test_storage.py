@@ -2,7 +2,7 @@
 import pytest
 import os
 import tempfile
-from storage import StorageManager, StorageError, PasswordRequired, ArchiveError
+from manifest_manager.storage import StorageManager, StorageError, PasswordRequired, ArchiveError
 
 @pytest.fixture
 def storage(): return StorageManager()
