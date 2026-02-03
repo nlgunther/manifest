@@ -123,15 +123,20 @@ class NodeSpec:
         )
 
 @dataclass
+@dataclass
 class Result:
     """Standardized return type for all operations."""
     success: bool
     message: str
-    data: Any = None
+    data: Optional[Dict[str, Any]] = None
+    
     @classmethod
-    def ok(cls, msg: str, data=None): return cls(True, msg, data)
+    def ok(cls, message: str, data: Optional[Dict[str, Any]] = None):
+        return cls(True, message, data)
+    
     @classmethod
-    def fail(cls, msg: str): return cls(False, msg)
+    def fail(cls, message: str, data: Optional[Dict[str, Any]] = None):
+        return cls(False, message, data)
 
 # --- Logic ---
 
@@ -444,6 +449,9 @@ class ManifestRepository:
                 existing_ids = {elem.get("id") for elem in self.root.iter() if elem.get("id")}
                 attrs['id'] = self.generate_id(existing_ids)
             
+            # Capture ID for return (new in v3.6)
+            created_id = attrs.get('id')
+            
             for p in parents:
                 n = etree.SubElement(p, spec.tag, **attrs)
                 if spec.text: n.text = Validator.sanitize(spec.text)
@@ -455,7 +463,12 @@ class ManifestRepository:
                     self.id_sidecar.add(attrs['id'], xpath)
             
             self.modified = True
-            return Result.ok(f"Added node to {len(parents)} location(s).")
+            
+            # Return ID in data field (new in v3.6)
+            return Result.ok(
+                f"Added node to {len(parents)} location(s).",
+                data={'id': created_id, 'count': len(parents)} if created_id else None
+            )
 
     def edit_node(self, xpath: str, spec: Optional[NodeSpec], delete: bool) -> Result:
         if not self.tree: return Result.fail("No file loaded.")
@@ -585,7 +598,15 @@ class ManifestView:
             
             # Headers
             if is_root_item:
-                lines.append(f"\n## {topic if topic else tag.upper()}")
+                header = topic if topic else tag.upper()
+                
+                # Show ID for root element (fix: was missing)
+                elem_id = node.get("id")
+                if elem_id:
+                    header += f" [id={elem_id}]"
+                
+                lines.append(f"\n## {header}")
+                
                 if not text and not status:
                     for c in node: _recurse(c, level + 1, False, current_depth + 1)
                     return

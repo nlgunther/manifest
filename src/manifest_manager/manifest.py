@@ -657,7 +657,26 @@ class ManifestShell(cmd.Cmd):
             
             # Use factory method (v3.4)
             spec = NodeSpec.from_args(args, attributes=attrs)
-            print(self.repo.add_node(parent_xpath, spec, auto_id=auto_id).message)
+            result = self.repo.add_node(parent_xpath, spec, auto_id=auto_id)
+            
+            # Display ID if available (new in v3.6)
+            if result.success and result.data and result.data.get('id'):
+                node_id = result.data['id']
+                print(f"✓ Added node with ID: {node_id}")
+                
+                # Show details if attributes were set
+                if args.topic or args.status or args.resp or args.due:
+                    if args.topic:
+                        print(f"  topic: {args.topic}")
+                    if args.status:
+                        print(f"  status: {args.status}")
+                    if args.resp:
+                        print(f"  resp: {args.resp}")
+                    if args.due:
+                        print(f"  due: {args.due}")
+            else:
+                print(result.message)
+        
         self._exec(_run)
 
 
