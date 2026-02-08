@@ -18,8 +18,9 @@ manifest = "manifest_manager.__main__:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["manifest_manager"]
+packages = ["manifest_manager", "shared", "shared.calendar"]  # Add shared packages
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+pythonpath = ["src"]  # Note: This is a LIST, not a string
