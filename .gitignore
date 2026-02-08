@@ -1,8 +1,10 @@
 # install and path files to ignore for Python projects
 *install*
+*fix*
+*harmonize*
 *patch*
 *temp*
-*~backup*
+*backup*
 ~*
 .~*
 *implement*

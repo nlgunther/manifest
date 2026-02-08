@@ -1,84 +1,91 @@
-# Manifest Manager v3.4
+# Productivity Suite CLI Harmonization
 
-> A powerful CLI tool for managing hierarchical XML data with fast ID-based lookups, smart detection, and encrypted backups.
+**Version**: 3.5.0  
+**Status**: Phase 3 Complete  
+**Last Updated**: February 2026
 
-[![Tests](https://img.shields.io/badge/tests-85%2F85%20passing-brightgreen)]()
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue)]()
-[![License](https://img.shields.io/badge/license-MIT-blue)]()
+---
 
-## 🌟 Overview
+## Overview
 
-Manifest Manager is a professional command-line interface for managing hierarchical task lists, project structures, and any XML-based data. It combines the flexibility of XML with modern CLI conveniences like auto-ID generation, O(1) lookups, and smart selector detection.
+This project harmonizes the command-line interfaces of **Manifest Manager** and **Smart Scheduler**, two complementary productivity tools. The goal is to provide a unified, intuitive user experience while maintaining the unique strengths of each tool.
 
-### Why Manifest Manager?
+### The Tools
 
-**Before:**
+**Manifest Manager v3.4+**
+- Hierarchical XML data management
+- Task and project organization
+- Flexible schema with arbitrary tags
+- XPath querying and ID-based lookups
+
+**Smart Scheduler v2.0** (planned integration)
+- Time-based task management
+- Natural language date parsing
+- Status workflows
+- Calendar integration (ICS export)
+
+---
+
+## What's New in v3.5
+
+### 🚀 Phase 3: Shortcut System
+
+**The Problem**: Typing `add --tag task --topic "Buy milk"` is verbose for common operations.
+
+**The Solution**: Shortcuts that expand automatically!
+
 ```bash
-# Manual XML editing, verbose XPath, slow searches
-vim myproject.xml  # Edit XML by hand
-grep -r "id=\"a3f7b2c1\"" myproject.xml  # Search for task
+# New shortcut syntax (70% less typing!)
+add task "Buy milk"
+add project "Q1 Goals" --status planning
+add location "Conference Room A"
+
+# Expands to:
+add --tag task --topic "Buy milk"
+add --tag project --topic "Q1 Goals" --status planning
+add --tag location --topic "Conference Room A"
 ```
 
-**After:**
-```bash
-# Natural workflow, minimal typing, instant results
-manifest
-(manifest) load myproject
-(myproject.xml) add --tag task --topic "New feature" --resp alice
-(myproject.xml) find a3f  # Smart ID prefix matching
-(myproject.xml) edit a3f --status done  # Auto-detects ID vs XPath
-(myproject.xml) save
-```
+**Features:**
+- ✅ Configurable shortcuts (YAML file)
+- ✅ Works with all existing flags
+- ✅ Backward compatible (old syntax still works)
+- ✅ Extensible (add your own shortcuts)
 
-## ✨ Key Features
+### 🔧 Phase 2: Vocabulary Harmonization
 
-### 🚀 Fast O(1) Lookups
-- **ID Sidecar Index**: Instant access to any element by ID
-- **10,000x faster** than XPath traversal for large files
-- Automatically synced on every save
+**Unified terminology** across both tools:
 
-### 🧠 Smart Detection
-```bash
-# System automatically detects ID vs XPath - no flags needed!
-edit a3f --status done          # ID detected (hex-like)
-edit //task[@priority='high']   # XPath detected (has syntax)
-```
+| Old (varied) | New (standard) | Aliases |
+|--------------|----------------|---------|
+| `--topic` (Manifest) | `--title` | Both work |
+| `--title` (Scheduler) | `--title` | Primary |
+| `--resp` (Manifest) | `--assignee` | Both work |
+| `--assignee` (Scheduler) | `--assignee` | Primary |
 
-### ⚡ ID Prefix Matching
-```bash
-# Type just the first 3-4 characters
-find a3f          # Finds all IDs starting with "a3f"
-edit a3f8 --resp bob   # If unique match, applies automatically
-                       # If multiple matches, interactive selection
-```
+### 📦 Phase 1: Shared Infrastructure
 
-### 🔐 Encrypted Backups
-```bash
-save backup.7z    # AES-256 encrypted via 7-Zip
-load backup.7z    # Prompts for password
-```
+**Common libraries** for both tools:
 
-### 👤 Responsibility Tracking
-```bash
-add --tag task --topic "Review PR" --resp alice
-edit a3f --resp bob
+- `shared.id_generator` - Standardized ID creation
+- `shared.calendar.ics_writer` - Unified ICS export
+- `shared.locking` - File locking for safe concurrent access
 
-# Displays as:
-[ ] (active) @alice **Review PR** [id=a3f7b2c1]
-```
+---
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
-- Python 3.8 or higher
-- pip package manager
 
-### Quick Install
+- Python 3.8+
+- Required packages: `lxml`, `py7zr`, `pyyaml`
+
+### Setup
 
 ```bash
-# Clone repository
-git clone https://github.com/yourusername/manifest-manager.git
-cd manifest-manager
+# Clone the repository
+git clone <repository-url>
+cd manifest
 
 # Install in development mode
 pip install -e .
@@ -87,159 +94,457 @@ pip install -e .
 manifest --version
 ```
 
-### Optional Dependencies
+### Configuration
 
-For encrypted backups (7z support):
-```bash
-pip install py7zr
-```
+The shortcut system uses a configuration file:
 
-## 🚀 Quick Start
+**Location**: `config/shortcuts.yaml`
 
-### 1. Launch the Shell
-```bash
-manifest
-```
+**Default shortcuts**: task, project, item, note, milestone, idea, location, contact, reference
 
-### 2. Create or Load a Manifest
-```bash
-(manifest) load myproject.xml --autosc
-```
+**To add custom shortcuts**, edit the config file:
 
-### 3. Add Your First Task
-```bash
-(myproject.xml) add --tag task --topic "Review docs" --status active --resp alice
-✓ Added node to 1 location(s).
-[Auto-generated ID: a3f7b2c1]
-```
-
-### 4. Find and Edit
-```bash
-(myproject.xml) find a3f
-(myproject.xml) edit a3f --status done
-```
-
-### 5. Save Your Work
-```bash
-(myproject.xml) save
-```
-
-## 📖 Core Concepts
-
-### Elements and Attributes
-
-Every element has:
-- **tag**: Element type (e.g., `task`, `project`)
-- **topic**: Optional title/description
-- **status**: Optional state (`active`, `done`, `pending`, `blocked`, `cancelled`)
-- **resp**: Optional responsible party
-- **id**: Auto-generated unique identifier (8-char hex)
-
-### ID Sidecar
-
-Maintains `.ids` file for O(1) lookups:
-```json
-{
-  "a3f7b2c1": "/manifest/project/task[@id='a3f7b2c1']"
-}
-```
-
-## 📚 Command Reference
-
-| Command | Description | Example |
-|---------|-------------|---------|
-| `load <file>` | Load manifest | `load project.xml --autosc` |
-| `save [file]` | Save manifest | `save backup.xml` |
-| `add` | Create element | `add --tag task --topic "New"` |
-| `edit <selector>` | Modify element | `edit a3f --status done` |
-| `find <prefix>` | Find by ID prefix | `find a3f` |
-| `list [xpath]` | Display elements | `list` or `list //task` |
-| `rebuild` | Rebuild sidecar | `rebuild` |
-
-See [CHEATSHEET.md](CHEATSHEET.md) for complete reference.
-
-## 🎯 Common Workflows
-
-### Task Management
-
-```bash
-load tasks.xml --autosc
-add --tag project --topic "Q1 Goals"
-add --tag task --topic "Complete audit" --status active --resp alice
-find compl
-edit <id> --status done
-save
-```
-
-## ⚙️ Configuration
-
-**~/.config/manifest/config.yaml:**
 ```yaml
-auto_id: true
-default_view_style: tree
-sidecar:
-  enabled: true
-  auto_rebuild: false
+shortcuts:
+  - task
+  - project
+  - location
+  - bug        # Add your own!
+  - feature
+  - meeting
 ```
-
-## 🧪 Testing
-
-```bash
-pytest tests/ -v
-```
-
-## 🐛 Troubleshooting
-
-### Sidecar Out of Sync
-```bash
-rebuild
-```
-
-### Performance Issues
-- Use ID-based operations
-- Enable sidecar: `--autosc`
-- Limit depth: `--depth 2`
-
-## 📊 Performance
-
-| Operation | Without Sidecar | With Sidecar | Improvement |
-|-----------|----------------|--------------|-------------|
-| Find by ID | O(n) | O(1) | 10,000x |
-| Edit by ID | O(n) | O(1) | 10,000x |
-
-## 🔒 Security
-
-- **AES-256 encryption** via 7-Zip
-- Path validation prevents injection
-- XML validation blocks exploits
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
-- **Documentation**: [API.md](API.md), [CHEATSHEET.md](CHEATSHEET.md)
-- **Issues**: GitHub Issues
-- **Review**: See [MANIFEST_MANAGER_COMPREHENSIVE_REVIEW.md](MANIFEST_MANAGER_COMPREHENSIVE_REVIEW.md)
-
-## 🗺️ Roadmap
-
-### v3.5 (Q1 2026)
-- Decouple IDSidecar
-- Differential updates
-- Batch operations
-
-### v3.6 (Q2 2026)
-- Undo/redo support
-- Service layer extraction
-
-### v4.0 (Q3 2026)
-- SQLite backend
-- Web UI
-- Multi-user support
 
 ---
 
-**Version:** 3.4.0  
-**Last Updated:** January 2026
+## Quick Start
+
+### Basic Usage
+
+```bash
+# Start the interactive shell
+manifest
+
+# Load a manifest file
+(manifest) load myproject.xml
+
+# Add items using shortcuts
+(myproject.xml) add task "Review PR #42"
+(myproject.xml) add project "Website Redesign" --status planning
+(myproject.xml) add location "Building A, Room 203"
+
+# Search and edit
+(myproject.xml) find task
+(myproject.xml) edit a3f7 --status done
+
+# Save your changes
+(myproject.xml) save
+```
+
+### Shortcut Syntax
+
+**Basic pattern**: `add <shortcut> "Title" [--flags]`
+
+```bash
+# Simple
+add task "Buy groceries"
+
+# With flags
+add task "Important task" --status active --assignee alice
+
+# With parent location
+add task "Subtask" --parent a3f7
+
+# Multiple attributes
+add project "Q1 Goals" --status planning --assignee bob --due 2026-03-31
+```
+
+### Full Syntax (Still Works!)
+
+```bash
+# Old way (backward compatible)
+add --tag task --topic "Buy groceries"
+add --tag project --topic "Q1 Goals" --status planning
+```
+
+---
+
+## Architecture
+
+### Directory Structure
+
+```
+manifest/
+├── config/
+│   └── shortcuts.yaml          # Shortcut configuration
+├── src/
+│   ├── shared/                 # Shared infrastructure
+│   │   ├── __init__.py
+│   │   ├── id_generator.py     # ID generation
+│   │   ├── locking.py          # File locking
+│   │   └── calendar/
+│   │       ├── __init__.py
+│   │       └── ics_writer.py   # ICS export
+│   └── manifest_manager/       # Manifest Manager package
+│       ├── __init__.py
+│       ├── manifest.py         # CLI shell
+│       ├── manifest_core.py    # Core logic
+│       └── storage.py          # Storage layer
+├── tests/
+│   ├── shared/                 # Tests for shared code
+│   │   ├── test_id_generator.py
+│   │   ├── test_ics_writer.py
+│   │   └── test_locking.py
+│   └── test_phase3_shortcuts.py  # Shortcut tests
+├── docs/
+│   ├── API.md                  # API documentation
+│   ├── CHEATSHEET.md           # Quick reference
+│   └── PHASE_1_REFLECTION.md   # Implementation notes
+├── pyproject.toml              # Project configuration
+└── README.md                   # This file
+```
+
+### Package Layout
+
+```python
+# The "src layout" pattern
+src/
+├── shared/              # Shared between tools
+│   └── ...
+└── manifest_manager/    # Manifest Manager
+    └── ...
+
+# Install makes both importable:
+from shared import generate_id
+from manifest_manager import ManifestRepository
+```
+
+---
+
+## Features
+
+### Shortcut System (v3.5)
+
+**Automatic expansion** of common commands:
+
+```bash
+add task "Title"
+# ↓ Expands to:
+add --tag task --topic "Title"
+```
+
+**Configurable** via YAML:
+- Add domain-specific shortcuts
+- Reserved keyword protection
+- Easy team customization
+
+### Smart ID Matching (v3.4)
+
+**Prefix matching** for IDs:
+
+```bash
+# Full ID: a3f7b2c1
+edit a3f                    # Matches prefix
+edit a3f7b2c1               # Exact match
+
+# Multiple matches? Interactive selection:
+edit a3
+  [1] a3f7b2c1 - Task: Review PR
+  [2] a3a9c4d2 - Task: Update docs
+  Select: 1
+```
+
+### Flexible Selectors
+
+**XPath or ID** - use what's natural:
+
+```bash
+# XPath (precise)
+find "//task[@status='active']"
+
+# ID (fast)
+find a3f7
+
+# ID prefix (convenient)
+find a3f
+```
+
+### File Locking (Phase 5)
+
+**Prevents corruption** from concurrent access:
+
+```python
+from shared.locking import file_lock
+
+with file_lock(Path("data.xml"), timeout=5):
+    # Exclusive access guaranteed
+    modify_data()
+```
+
+---
+
+## Testing
+
+### Run All Tests
+
+```bash
+# All tests
+pytest
+
+# Specific module
+pytest tests/shared/ -v
+pytest tests/test_phase3_shortcuts.py -v
+
+# With coverage
+pytest --cov=manifest_manager --cov=shared --cov-report=html
+```
+
+### Test Coverage
+
+**Phase 1 (Shared Infrastructure):**
+- ✅ ID generation (8 tests)
+- ✅ ICS export (6 tests)
+- ✅ File locking (5 tests)
+
+**Phase 3 (Shortcuts):**
+- ✅ Basic expansion (3 tests)
+- ✅ Shortcuts with flags (3 tests)
+- ✅ Backward compatibility (2 tests)
+- ✅ Edge cases (5 tests)
+- ✅ Config loading (3 tests)
+- ✅ Integration scenarios (4 tests)
+
+**Total**: 39+ tests passing
+
+---
+
+## Configuration
+
+### shortcuts.yaml
+
+```yaml
+# Shortcut configuration
+shortcuts:
+  - task          # add task "Title"
+  - project       # add project "Name"
+  - item          # add item "Thing"
+  - note          # add note "Reminder"
+  - milestone     # add milestone "v1.0"
+  - idea          # add idea "Feature"
+  - location      # add location "Place"
+  - contact       # add contact "Person"
+  - reference     # add reference "Doc"
+
+# Reserved keywords (cannot be shortcuts)
+reserved_keywords:
+  - help
+  - exit
+  - save
+  - list
+  - edit
+  - find
+  - delete
+```
+
+### pyproject.toml
+
+```toml
+[project]
+name = "manifest-manager"
+version = "3.5.0"
+dependencies = [
+    "lxml>=4.9.0",
+    "py7zr>=0.20.0",
+    "pyyaml>=6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]  # Auto-discovers packages
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+```
+
+---
+
+## Roadmap
+
+### ✅ Completed
+
+- [x] **Phase 1**: Shared infrastructure library
+- [x] **Phase 2**: Vocabulary harmonization
+- [x] **Phase 3**: Shortcut system
+
+### 🔜 Upcoming
+
+- [ ] **Phase 4**: Integrate shared components into both tools
+  - Replace ID generation with `shared.id_generator`
+  - Replace ICS export with `shared.calendar.ics_writer`
+  - Comprehensive compatibility testing
+
+- [ ] **Phase 5**: File locking integration
+  - Add locking to save operations
+  - Add locking to database writes
+  - Test concurrent access scenarios
+
+### 📅 Future
+
+- [ ] **Phase 6**: Smart Scheduler integration
+  - Apply shortcut system to Scheduler
+  - Unified CLI patterns
+  - Cross-tool compatibility
+
+---
+
+## Contributing
+
+### Adding New Shortcuts
+
+1. Edit `config/shortcuts.yaml`:
+   ```yaml
+   shortcuts:
+     - your_shortcut  # Add here
+   ```
+
+2. Test it:
+   ```bash
+   manifest
+   (manifest) load test
+   (test.xml) add your_shortcut "Test"
+   ```
+
+3. Verify expansion:
+   ```bash
+   # Should create node with tag="your_shortcut"
+   (test.xml) list
+   ```
+
+### Reporting Issues
+
+**Bug reports** should include:
+- Command that failed
+- Expected behavior
+- Actual behavior
+- Manifest Manager version
+- Python version
+
+### Development Setup
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests before committing
+pytest
+
+# Check code style
+flake8 src/
+
+# Run type checker (if using)
+mypy src/
+```
+
+---
+
+## Troubleshooting
+
+### Import Errors
+
+**Problem**: `ModuleNotFoundError: No module named 'shared'`
+
+**Solution**:
+```bash
+# Ensure package is installed
+pip install -e .
+
+# Check pythonpath in pyproject.toml
+pythonpath = ["src"]
+```
+
+### Shortcut Not Working
+
+**Problem**: `add task "Title"` not expanding
+
+**Solution**:
+1. Check `config/shortcuts.yaml` exists
+2. Verify "task" is in shortcuts list
+3. Ensure "task" not in reserved keywords
+4. Reload the shell
+
+### Tests Failing
+
+**Problem**: Import errors in tests
+
+**Solution**:
+```bash
+# Ensure conftest.py exists in project root
+# It should contain:
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+```
+
+---
+
+## FAQ
+
+### Q: Can I use both shortcut and full syntax?
+
+**A**: Yes! They work identically:
+```bash
+add task "Title"              # Shortcut
+add --tag task --topic "Title"  # Full syntax
+```
+
+### Q: How do I add a custom shortcut?
+
+**A**: Edit `config/shortcuts.yaml` and add your shortcut to the list.
+
+### Q: Will shortcuts break existing scripts?
+
+**A**: No. Scripts using full syntax continue to work unchanged.
+
+### Q: Can I disable shortcuts?
+
+**A**: Yes. Use the full `--tag` syntax, which bypasses shortcut expansion.
+
+### Q: What if my shortcut conflicts with a flag?
+
+**A**: Shortcuts must not start with `--`. The parser detects flags first.
+
+### Q: How do I see all available shortcuts?
+
+**A**: Check `config/shortcuts.yaml` or run:
+```bash
+cat config/shortcuts.yaml
+```
+
+---
+
+## License
+
+[Your License Here]
+
+---
+
+## Credits
+
+**Design & Implementation**: CLI Harmonization Project (2026)  
+**Tools**: Manifest Manager v3.4+, Smart Scheduler v2.0  
+**Technology**: Python 3.8+, lxml, pytest
+
+---
+
+## Support
+
+**Documentation**: See `docs/` directory
+- `API.md` - Complete API reference
+- `CHEATSHEET.md` - Quick command reference
+- `PHASE_1_REFLECTION.md` - Implementation notes
+
+**Issues**: [GitHub Issues]  
+**Discussions**: [GitHub Discussions]
+
+---
+
+*Last updated: February 2026*

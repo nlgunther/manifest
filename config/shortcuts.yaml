@@ -1,0 +1,48 @@
+# Manifest Manager Shortcuts Configuration
+# ==========================================
+# Define shortcuts for the "add" command.
+# 
+# Syntax:  add <shortcut> "Title" [--other-flags]
+# Expands: add --tag <shortcut> --title "Title" [--other-flags]
+#
+# Guidelines:
+# - Use singular nouns (task, not tasks)
+# - Avoid CLI keywords (help, exit, save, list, etc.)
+# - Keep them memorable and intuitive
+
+shortcuts:
+  # Core entity types
+  - task
+  - project
+  - item
+  - note
+  - milestone
+  - idea
+  
+  # Extended types (add your own here!)
+  - location
+  - contact
+  - reference
+  - resource
+  
+  # Domain-specific (examples)
+  # - bug
+  # - feature
+  # - meeting
+  # - document
+
+# Reserved keywords (shortcuts cannot use these)
+reserved_keywords:
+  - help
+  - exit
+  - quit
+  - save
+  - list
+  - search
+  - find
+  - delete
+  - remove
+  - edit
+  - show
+  - export
+  - import

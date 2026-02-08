@@ -457,6 +457,29 @@ class ManifestShell(cmd.Cmd):
 
     # --- Commands ---
 
+    def _load_shortcuts(self) -> set:
+        """Load valid shortcuts from config file."""
+        defaults = {'task', 'project', 'item', 'note', 'milestone', 'idea', 'location'}
+        
+        try:
+            import yaml
+            from pathlib import Path
+            config_path = Path(__file__).parent.parent.parent / "config" / "shortcuts.yaml"
+            
+            if not config_path.exists():
+                return defaults
+            
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            
+            shortcuts = set(config.get('shortcuts', []))
+            reserved = set(config.get('reserved_keywords', []))
+            return shortcuts - reserved
+            
+        except Exception:
+            return defaults
+
+
     def do_load(self, arg):
         """Load manifest: load <file> [--auto-sidecar] [--rebuild-sidecar]
         
@@ -598,7 +621,12 @@ class ManifestShell(cmd.Cmd):
         self._exec(_run)
 
     def do_add(self, arg):
-        """Add node: add --tag task "Desc"
+        """Add node: add task "Desc" (Shortcut) OR add --tag task "Desc" (Full)
+        
+        Shortcuts (v3.5+):
+          add task "Title"      → add --tag task --topic "Title"
+          add location "Place"  → add --tag location --topic "Place"
+          (See config/shortcuts.yaml)
         
         Options:
           --parent <selector>  Parent location (XPath or ID shortcut, default: /*)
@@ -632,7 +660,28 @@ class ManifestShell(cmd.Cmd):
         p.add_argument("text", nargs="?", help="Body text")
 
         def _run():
-            args = p.parse_args(shlex.split(arg))
+            # --- Phase 3: Shortcut Expansion ---
+            parts = shlex.split(arg)
+            shortcuts = self._load_shortcuts()
+            
+            # Detect shortcut: <noun> "Title" [--flags]
+            if parts and parts[0] in shortcuts and not parts[0].startswith('-'):
+                # Expand: task "Title" -> --tag task --topic "Title"
+                tag = parts[0]
+                new_parts = ['--tag', tag]
+                
+                # If next item is not a flag, treat it as topic
+                if len(parts) > 1 and not parts[1].startswith('-'):
+                    new_parts.extend(['--topic', parts[1]])
+                    new_parts.extend(parts[2:])  # Remaining flags
+                else:
+                    new_parts.extend(parts[1:])  # No topic, just flags
+                
+                args = p.parse_args(new_parts)
+            else:
+                # Standard full-syntax parsing
+                args = p.parse_args(parts)
+            # -----------------------------------
             attrs = self._parse_attrs(args.attr)
             
             # Resolve parent selector to XPath (supports ID shortcuts)
