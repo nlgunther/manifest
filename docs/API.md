@@ -25,15 +25,18 @@
 Load a manifest file (XML or encrypted 7z).
 
 **Syntax:**
+
 ```bash
 load <filename> [--autosc] [--autoid]
 ```
 
 **Options:**
+
 - `--autosc` - Auto-save on changes
 - `--autoid` - Enable automatic ID generation
 
 **Examples:**
+
 ```bash
 load project.xml
 load project.xml --autosc
@@ -47,16 +50,42 @@ load backup.7z  # Prompts for password
 Add a new node to the manifest.
 
 **Shortcut Syntax** (v3.5+):
+
 ```bash
 add <shortcut> "Title" [--flags]
 ```
 
+**⚠️ Important**: The title must come immediately after the shortcut noun.
+
+✅ **Correct order**:
+
+```bash
+add task "Buy Milk" --status active
+# Expands to: --tag task --topic "Buy Milk" --status active
+```
+
+❌ **Wrong order** (flags before title):
+
+```bash
+add task --status active "Buy Milk"
+# Expands to: --tag task --status active "Buy Milk"
+# Result: "Buy Milk" becomes body text, not the topic!
+```
+
+**Workaround**: Use full syntax if you need flags first:
+
+```bash
+add --tag task --status active --topic "Buy Milk"
+```
+
 **Full Syntax**:
+
 ```bash
 add --tag <tag> [--topic "Title"] [--flags]
 ```
 
 **Options:**
+
 - `--tag <name>` - Node tag name (required in full syntax)
 - `--topic <text>` - Topic/title text
 - `--title <text>` - Alias for --topic (v3.4+)
@@ -71,6 +100,7 @@ add --tag <tag> [--topic "Title"] [--flags]
 - `text` - Body text content
 
 **Shortcut Examples:**
+
 ```bash
 # Basic
 add task "Buy groceries"
@@ -98,6 +128,7 @@ add task "Database migration" -a priority=high -a team=backend
 ```
 
 **Full Syntax Examples:**
+
 ```bash
 # Traditional syntax (still works)
 add --tag task --topic "Buy groceries"
@@ -106,6 +137,7 @@ add --tag item --topic "Office supplies" --parent "//location[@title='Storage']"
 ```
 
 **Parent Selector Detection:**
+
 - Contains `/` → XPath
 - Hex-like (3-8 chars) → ID prefix
 - Exact match in sidecar → Full ID
@@ -117,20 +149,24 @@ add --tag item --topic "Office supplies" --parent "//location[@title='Storage']"
 Modify an existing node.
 
 **Syntax:**
+
 ```bash
 edit <selector> [--flags]
 ```
 
 **Selector Types:**
+
 - Full ID: `a3f7b2c1`
 - ID prefix: `a3f7` (shows selection if multiple matches)
 - XPath: `//task[@status='active']`
 
 **Options:**
+
 - Same as `add` command (except --tag)
 - `--clear-<attr>` - Remove an attribute
 
 **Examples:**
+
 ```bash
 # Edit by full ID
 edit a3f7b2c1 --status done
@@ -155,21 +191,25 @@ edit a3f7 --status done --resp alice --topic "Updated title"
 Search for nodes using XPath or ID.
 
 **Syntax:**
+
 ```bash
 find <selector> [--view <format>]
 ```
 
 **Selector Types:**
+
 - XPath: `//task[@status='active']`
 - ID: `a3f7b2c1`
 - ID prefix: `a3f`
 
 **View Formats:**
+
 - `tree` (default) - Hierarchical tree view
 - `table` - Tabular view
 - `compact` - Minimal output
 
 **Examples:**
+
 ```bash
 # Find by tag
 find //task
@@ -195,16 +235,19 @@ find //project --view compact
 List all nodes in the manifest.
 
 **Syntax:**
+
 ```bash
 list [--view <format>]
 ```
 
 **View Formats:**
+
 - `tree` (default)
 - `table`
 - `compact`
 
 **Examples:**
+
 ```bash
 list
 list --view table
@@ -218,15 +261,18 @@ list --view compact
 Save the current manifest.
 
 **Syntax:**
+
 ```bash
 save [filename] [--encrypt]
 ```
 
 **Options:**
+
 - `filename` - Save as different file
 - `--encrypt` - Save as encrypted 7z
 
 **Examples:**
+
 ```bash
 save                    # Save to current file
 save backup.xml         # Save as new file
@@ -240,11 +286,13 @@ save backup.7z          # Save as encrypted 7z (prompts for password)
 Delete a node.
 
 **Syntax:**
+
 ```bash
 delete <selector>
 ```
 
 **Examples:**
+
 ```bash
 delete a3f7
 delete "//task[@status='cancelled']"
@@ -257,11 +305,13 @@ delete "//task[@status='cancelled']"
 Wrap top-level nodes under a new parent.
 
 **Syntax:**
+
 ```bash
 wrap --tag <tag> --topic "Title"
 ```
 
 **Examples:**
+
 ```bash
 wrap --tag project --topic "Archive 2025"
 ```
@@ -273,16 +323,19 @@ wrap --tag project --topic "Archive 2025"
 Merge another manifest file into the current one.
 
 **Syntax:**
+
 ```bash
 merge <filename> [--strategy <strategy>]
 ```
 
 **Strategies:**
+
 - `union` - Combine all (default)
 - `source_wins` - Source wins conflicts
 - `target_wins` - Target wins conflicts
 
 **Examples:**
+
 ```bash
 merge other.xml
 merge backup.xml --strategy source_wins
@@ -297,11 +350,13 @@ merge backup.xml --strategy source_wins
 Rebuild the ID sidecar index.
 
 **Syntax:**
+
 ```bash
 rebuild
 ```
 
 **When to use:**
+
 - After manual XML edits
 - After merge operations
 - To verify sidecar consistency
@@ -313,11 +368,13 @@ rebuild
 Configure automatic ID generation.
 
 **Syntax:**
+
 ```bash
 autoid [on|off]
 ```
 
 **Examples:**
+
 ```bash
 autoid on
 autoid off
@@ -330,6 +387,7 @@ autoid off
 Display quick reference guide.
 
 **Syntax:**
+
 ```bash
 cheatsheet
 ```
@@ -341,6 +399,7 @@ cheatsheet
 Exit the shell (with unsaved changes warning).
 
 **Syntax:**
+
 ```bash
 exit
 ```
@@ -364,11 +423,13 @@ add --tag task --topic "Title"
 ### How It Works
 
 **Detection Logic:**
+
 1. First word is a known shortcut?
 2. First word doesn't start with `--`?
 3. → Expand to full syntax
 
 **Expansion Rules:**
+
 ```
 add <shortcut> "Title" [--flags]
   ↓
@@ -377,17 +438,17 @@ add --tag <shortcut> --topic "Title" [--flags]
 
 ### Default Shortcuts
 
-| Shortcut | Description | Example |
-|----------|-------------|---------|
-| `task` | Task items | `add task "Review PR"` |
-| `project` | Projects | `add project "Q1 Goals"` |
-| `item` | Generic items | `add item "Office chair"` |
-| `note` | Notes/reminders | `add note "Remember to..."` |
-| `milestone` | Milestones | `add milestone "v1.0 Release"` |
-| `idea` | Ideas | `add idea "Feature: Dark mode"` |
-| `location` | Locations | `add location "Conference Room A"` |
-| `contact` | Contacts | `add contact "John Doe"` |
-| `reference` | References | `add reference "Documentation link"` |
+| Shortcut    | Description     | Example                              |
+| ----------- | --------------- | ------------------------------------ |
+| `task`      | Task items      | `add task "Review PR"`               |
+| `project`   | Projects        | `add project "Q1 Goals"`             |
+| `item`      | Generic items   | `add item "Office chair"`            |
+| `note`      | Notes/reminders | `add note "Remember to..."`          |
+| `milestone` | Milestones      | `add milestone "v1.0 Release"`       |
+| `idea`      | Ideas           | `add idea "Feature: Dark mode"`      |
+| `location`  | Locations       | `add location "Conference Room A"`   |
+| `contact`   | Contacts        | `add contact "John Doe"`             |
+| `reference` | References      | `add reference "Documentation link"` |
 
 ### Configuration
 
@@ -416,6 +477,7 @@ reserved_keywords:
 ### Reserved Keywords
 
 These words **cannot** be shortcuts:
+
 - `help`, `exit`, `quit`
 - `save`, `load`
 - `list`, `find`, `edit`, `delete`
@@ -435,12 +497,14 @@ These words **cannot** be shortcuts:
 Generate a unique hexadecimal ID.
 
 **Parameters:**
+
 - `prefix` (str): Optional prefix (e.g., "t" for task)
 - `length` (int): Length of hex part (default: 8)
 
 **Returns:** String ID
 
 **Examples:**
+
 ```python
 from shared.id_generator import generate_id
 
@@ -459,6 +523,7 @@ short_id = generate_id(length=4)  # "a3f7"
 Validate ID format.
 
 **Parameters:**
+
 - `id_str` (str): ID to validate
 - `prefix` (str, optional): Expected prefix
 - `min_length` (int): Minimum length (default: 3)
@@ -466,6 +531,7 @@ Validate ID format.
 **Returns:** bool
 
 **Examples:**
+
 ```python
 from shared.id_generator import validate_id
 
@@ -482,6 +548,7 @@ Split ID into prefix and hex parts.
 **Returns:** tuple[str, str]
 
 **Examples:**
+
 ```python
 from shared.id_generator import extract_prefix
 
@@ -500,6 +567,7 @@ extract_prefix("a3f7b2c1")  # ("", "a3f7b2c1")
 Dataclass representing a calendar event.
 
 **Attributes:**
+
 - `uid` (str): Unique identifier
 - `title` (str): Event title
 - `start_date` (datetime|date): Start date/time
@@ -512,6 +580,7 @@ Dataclass representing a calendar event.
 - `url` (str, optional): Associated URL
 
 **Example:**
+
 ```python
 from shared.calendar.ics_writer import CalendarEvent
 from datetime import date
@@ -530,6 +599,7 @@ event = CalendarEvent(
 Writer for iCalendar (.ics) files.
 
 **Constructor:**
+
 ```python
 ICSWriter(calendar_name="Exported Calendar", timezone_str="UTC", description=None)
 ```
@@ -549,6 +619,7 @@ Write calendar to .ics file.
 Generate ICS content as string.
 
 **Example:**
+
 ```python
 from shared.calendar.ics_writer import CalendarEvent, ICSWriter
 from datetime import date
@@ -584,15 +655,18 @@ writer.write("tasks.ics")
 Context manager for exclusive file access.
 
 **Parameters:**
+
 - `filepath` (Path): File to lock
 - `timeout` (int): Seconds to wait (default: 5)
 - `poll_interval` (float): Retry interval (default: 0.1)
 - `stale_threshold` (int): Stale lock age in seconds (default: 300)
 
 **Raises:**
+
 - `LockTimeout`: If lock cannot be acquired
 
 **Example:**
+
 ```python
 from shared.locking import file_lock
 from pathlib import Path
@@ -611,6 +685,7 @@ Check if file is currently locked.
 **Returns:** PID of lock holder, or None
 
 **Example:**
+
 ```python
 from shared.locking import check_lock
 from pathlib import Path
@@ -635,6 +710,7 @@ if holder:
 Add a node to the manifest.
 
 **Parameters:**
+
 - `parent_xpath` (str): Parent XPath
 - `spec` (NodeSpec): Node specification
 - `auto_id` (bool): Auto-generate ID
@@ -642,6 +718,7 @@ Add a node to the manifest.
 **Returns:** Result object
 
 **Example:**
+
 ```python
 from manifest_manager import ManifestRepository, NodeSpec
 
@@ -662,6 +739,7 @@ if result.success:
 Find nodes by XPath.
 
 **Parameters:**
+
 - `xpath` (str): XPath query
 - `view` (ManifestView): Output format
 
@@ -672,6 +750,7 @@ Find nodes by XPath.
 Edit a node.
 
 **Parameters:**
+
 - `selector` (str): XPath or ID
 - `updates` (dict): Attributes to update
 
@@ -696,6 +775,7 @@ Factory for creating node specifications.
 Create spec from argparse namespace.
 
 **Example:**
+
 ```python
 from manifest_manager import NodeSpec
 
@@ -818,12 +898,14 @@ add task "Detail" --parent "//project//milestone[@title='v1.0']"
 ### Common Errors
 
 **ModuleNotFoundError**:
+
 ```bash
 # Solution
 pip install -e .
 ```
 
 **LockTimeout**:
+
 ```python
 # Another process is using the file
 # Wait or use longer timeout
@@ -832,6 +914,7 @@ with file_lock(path, timeout=30):
 ```
 
 **XPath Syntax Error**:
+
 ```bash
 # Invalid
 find //task[@status=active]  # Missing quotes
@@ -841,6 +924,7 @@ find "//task[@status='active']"
 ```
 
 **Shortcut Not Found**:
+
 ```bash
 # Check config
 cat config/shortcuts.yaml

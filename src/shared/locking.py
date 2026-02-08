@@ -14,9 +14,34 @@ def check_lock(filepath: Path) -> bool:
     return lock_path.exists()
 
 @contextmanager
-def file_lock(filepath: Path, timeout: int = 5, stale_threshold: int = None):
-    """
-    Acquire lock with optional stale lock cleanup.
+def file_lock(
+    filepath: Path,
+    timeout: int = 5,
+    poll_interval: float = 0.1,
+    stale_threshold: int = 300
+) -> None:
+    """Context manager for exclusive file access.
+    
+    KNOWN LIMITATION: Stale lock cleanup has a race condition in multi-process
+    scenarios. If concurrent processes both see an old lock, they may both delete
+    it and create new locks simultaneously. This is low-risk for single-user tools
+    but should be fixed before production multi-user deployment.
+    
+    Scheduled fix: Phase 5 (PID-based validation)
+    Workaround: Manually delete .lock files if needed
+    
+    Args:
+        filepath: File to lock
+        timeout: Seconds to wait for lock (default: 5)
+        poll_interval: Seconds between retry attempts (default: 0.1)
+        stale_threshold: Age in seconds to consider lock stale (default: 300)
+    
+    Raises:
+        LockTimeout: If lock cannot be acquired within timeout
+    
+    Example:
+        with file_lock(Path("data.xml")):
+            modify_data()
     """
     lock_path = filepath.with_suffix(filepath.suffix + ".lock")
     start = time.time()

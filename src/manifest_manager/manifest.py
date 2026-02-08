@@ -593,26 +593,28 @@ class ManifestShell(cmd.Cmd):
             # Note: save() will change self.repo.filepath to backup_path
             original_filepath = self.repo.filepath
             original_password = self.repo.password
-            
-            result = self.repo.save(backup_path, self.repo.password)
-            if not result.success:
-                print(f"Error: {result.message}")
-                return
-            
-            # Show success message
-            if args.force and os.path.exists(backup_path):
-                print(f"✓ Backup saved to {backup_path} (overwritten)")
-            else:
-                print(f"✓ Backup saved to {backup_path}")
-            
-            # 6. Backup sidecar if exists and not disabled
-            if self.repo.id_sidecar and not args.no_sidecar:
-                if backup_sidecar(original_filepath, backup_path):
-                    print(f"✓ Sidecar backed up to {backup_path}.ids")
-            
-            # 7. Restore original filepath (save() changes it)
-            self.repo.filepath = original_filepath
-            self.repo.password = original_password
+
+            try:
+                result = self.repo.save(backup_path, self.repo.password)
+                if not result.success:
+                    print(f"Error: {result.message}")
+                    return
+
+                # Show success message
+                if args.force and os.path.exists(backup_path):
+                    print(f"✓ Backup saved to {backup_path} (overwritten)")
+                else:
+                    print(f"✓ Backup saved to {backup_path}")
+
+                # 6. Backup sidecar if exists and not disabled
+                if self.repo.id_sidecar and not args.no_sidecar:
+                    if backup_sidecar(original_filepath, backup_path):
+                        print(f"✓ Sidecar backed up to {backup_path}.ids")
+            finally:
+                # 7. Restore original filepath (save() changes it)
+                # This ALWAYS runs, even if save() fails or we return early
+                self.repo.filepath = original_filepath
+                self.repo.password = original_password
             
             # Update prompt if needed
             if self.prompt.startswith("("):
