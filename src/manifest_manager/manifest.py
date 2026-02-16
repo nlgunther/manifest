@@ -381,6 +381,11 @@ class ManifestShell(cmd.Cmd):
         super().__init__()
         self.repo = ManifestRepository()
         self._confirm_exit = False
+        try:
+            from .dataframe_commands import add_dataframe_commands
+            add_dataframe_commands(self)
+        except ImportError:
+            pass  # DataFrame support optional
 
     def _exec(self, func):
         """Safe execution wrapper."""
