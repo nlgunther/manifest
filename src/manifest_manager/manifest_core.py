@@ -160,6 +160,29 @@ class Validator:
     def sanitize(text: str) -> str:
         return re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text or "")
 
+def _is_id_selector(selector: str, repo) -> bool:
+    """Detect if selector is an ID or XPath.
+
+    Heuristics (in order):
+        1. Contains XPath syntax (/, [, @, *, =) → XPath
+        2. Hex-like string 3-8 chars → ID prefix
+        3. Exists in sidecar → ID
+        4. Default → XPath (safe fallback)
+
+    Examples:
+        >>> _is_id_selector('a3f', repo)   # True  — hex prefix
+        >>> _is_id_selector('//task', repo) # False — XPath
+    """
+    if any(c in selector for c in ['/', '[', '@', '*', '=']):
+        return False
+    if 3 <= len(selector) <= 8 and all(c in '0123456789abcdef' for c in selector.lower()):
+        return True
+    if repo and hasattr(repo, 'id_sidecar') and repo.id_sidecar:
+        if repo.id_sidecar.exists(selector):
+            return True
+    return False
+
+
 class ManifestRepository:
     """
     Core Domain Service.
@@ -516,6 +539,118 @@ class ManifestRepository:
         
         # Delegate to existing edit_node
         return self.edit_node(xpath, spec, delete)
+
+    def move_node(self, src_selector: str, dest_selector: str) -> Result:
+        """Reparent a node (and its entire subtree) under a new parent.
+
+        Resolves both selectors the same way as edit: ID prefix → sidecar,
+        then XPath fallback.  After the move, sidecar entries for the moved
+        subtree are refreshed in-place (no full rebuild needed).
+
+        Args:
+            src_selector:  ID / ID-prefix / XPath of the node to move.
+            dest_selector: ID / ID-prefix / XPath of the new parent.
+
+        Returns:
+            Result indicating success or the first failure encountered.
+
+        Example:
+            >>> repo.move_node("a3f7", "//archive")
+            Result(success=True, message="Moved <task> under <archive>.")
+        """
+        if not self.tree:
+            return Result.fail("No file loaded.")
+
+        # --- resolve src ---
+        src_xpath, err = self._resolve_selector(src_selector)
+        if err:
+            return Result.fail(err)
+
+        ok, src_nodes = self._safe_xpath(src_xpath)
+        if not ok:
+            return Result.fail(src_nodes)
+        if not src_nodes:
+            return Result.fail(f"Source not found: {src_selector!r}")
+        if len(src_nodes) > 1:
+            return Result.fail(
+                f"Source selector matched {len(src_nodes)} nodes; "
+                "move requires an unambiguous single node."
+            )
+        src_elem = src_nodes[0]
+
+        # --- resolve dest ---
+        dest_xpath, err = self._resolve_selector(dest_selector)
+        if err:
+            return Result.fail(err)
+
+        ok, dest_nodes = self._safe_xpath(dest_xpath)
+        if not ok:
+            return Result.fail(dest_nodes)
+        if not dest_nodes:
+            return Result.fail(f"Destination not found: {dest_selector!r}")
+        if len(dest_nodes) > 1:
+            return Result.fail(
+                f"Destination selector matched {len(dest_nodes)} nodes; "
+                "move requires an unambiguous single destination."
+            )
+        dest_elem = dest_nodes[0]
+
+        # --- guard: dest must not be src or a descendant of src ---
+        if dest_elem is src_elem:
+            return Result.fail("Source and destination are the same node.")
+        ancestor = dest_elem.getparent()
+        while ancestor is not None:
+            if ancestor is src_elem:
+                return Result.fail(
+                    "Destination is a descendant of the source; "
+                    "move would create a cycle."
+                )
+            ancestor = ancestor.getparent()
+
+        with self.transaction():
+            src_tag = src_elem.tag
+            dest_tag = dest_elem.tag
+            # lxml append() detaches from old parent automatically.
+            dest_elem.append(src_elem)
+            self.modified = True
+
+            # Refresh sidecar entries for the moved subtree.
+            if self.id_sidecar:
+                from .id_sidecar import IDSidecar
+                for elem in src_elem.iter():
+                    elem_id = elem.get("id")
+                    if elem_id:
+                        self.id_sidecar.add(elem_id, IDSidecar._build_xpath(elem))
+
+            return Result.ok(f"Moved <{src_tag}> under <{dest_tag}>.")
+
+    def _resolve_selector(self, selector: str):
+        """Resolve an ID / ID-prefix / XPath selector to an XPath string.
+
+        Returns:
+            (xpath_str, None)  on success
+            (None, error_msg)  on failure
+        """
+        if _is_id_selector(selector, self):
+            if not self.id_sidecar:
+                return None, (
+                    "ID selector requires sidecar. "
+                    "Reload with --autosc or use XPath."
+                )
+            matches = [
+                elem for elem in self.root.iter()
+                if (elem.get("id") or "").startswith(selector)
+            ]
+            if not matches:
+                return None, f"ID not found: {selector!r}"
+            if len(matches) == 1:
+                return self.id_sidecar.get(matches[0].get("id")), None
+            # Multiple prefix hits — caller will surface the ambiguity error.
+            # Return a synthetic multi-match xpath so the caller's len>1 check fires.
+            ids = [e.get("id") for e in matches]
+            return f"id-prefix-ambiguous:{ids}", None
+        # Plain XPath
+        return selector, None
 
     def wrap_content(self, new_root_tag: str) -> Result:
         """
