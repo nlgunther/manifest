@@ -1292,6 +1292,35 @@ class ManifestShell(cmd.Cmd):
         
         self._exec(_run)
 
+    def do_move(self, arg):
+        """Move a node (and its subtree) under a new parent.
+
+        Usage:
+            move <src> <dest>
+
+        Arguments:
+            src   ID, ID-prefix, or XPath of the node to move.
+            dest  ID, ID-prefix, or XPath of the new parent.
+
+        Both selectors must resolve to exactly one node.
+        The entire subtree rooted at <src> moves with it.
+
+        Examples:
+            move a3f7 b1c2              # move by ID
+            move a3f //archive          # ID src, XPath dest
+            move "//task[@status='done']" //archive  # XPath → XPath (must be 1 match)
+        """
+        p = SafeParser(prog="move", description="Move a node under a new parent")
+        p.add_argument("src",  help="Source node: ID, ID-prefix, or XPath")
+        p.add_argument("dest", help="Destination parent: ID, ID-prefix, or XPath")
+
+        def _run():
+            args = p.parse_args(shlex.split(arg))
+            result = self.repo.move_node(args.src, args.dest)
+            print(result.message)
+
+        self._exec(_run)
+    
     def do_delete(self, arg):
         """Delete node(s): delete <id_or_xpath>
 

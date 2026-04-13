@@ -21,7 +21,89 @@ Add custom shortcuts in `config/shortcuts.yaml`.
 
 ---
 
+<<<<<<< HEAD
+
 ## File Operations
+
+=======
+
+## 📝 Full Syntax (Always Works)
+
+```bash
+# Traditional format
+add --tag task --topic "Buy milk"
+add --tag project --title "Q1 Goals" --status planning
+add --tag item --topic "Chair" --parent a3f7
+```
+
+**Note**: Use `--topic` or `--title` (they're aliases)
+
+---
+
+## 🔍 Finding Nodes
+
+### By XPath
+
+```bash
+find //task
+find "//task[@status='active']"
+find "//project[@title='Website']//task"
+```
+
+### By ID
+
+```bash
+find a3f7b2c1              # Full ID
+find a3f7                  # Prefix (shows selection if multiple)
+```
+
+### With View Formats
+
+```bash
+find //task --view tree    # Hierarchical (default)
+find //task --view table   # Tabular
+find //task --view compact # Minimal
+```
+
+---
+
+## ✏️ Editing Nodes
+
+### By ID
+
+```bash
+edit a3f7 --status done
+edit a3f7 --status done --assignee charlie
+edit a3f7 --clear-due      # Remove attribute
+```
+
+### By XPath
+
+```bash
+edit "//task[@title='Review']" --status in_progress
+```
+
+---
+
+# Move:
+
+  move <src> <dest>     Move node + subtree to a new parent
+      src               ID, ID-prefix, or XPath (must match exactly 1 node)
+      dest              ID, ID-prefix, or XPath of the new parent (must match exactly 1 node)
+
+# 
+
+## EXAMPLES:
+
+  move a3f7 b1c2                         # Move by ID
+  move a3f //archive                     # ID source, XPath destination
+  move "//task[@status='done']" //done   # XPath to XPath (1 match required)
+
+## 📂 File Operations
+
+### Load
+
+> > > > > > > 
 
 ```bash
 load project.xml
