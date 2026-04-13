@@ -1,541 +1,197 @@
 # Manifest Manager Cheatsheet
 
-**Version**: 3.5.0 | **Quick Reference Guide**
+**Version**: 3.5.0 | **Quick Reference**
 
 ---
 
-## 🚀 Shortcut Syntax (v3.5+)
-
-### Basic Pattern
+## Shortcut Syntax (v3.5+)
 
 ```bash
-add <shortcut> "Title" [--flags]
+add task "Title"                        # → add --tag task --topic "Title"
+add project "Q1 Goals" --status active
+add location "Room 203" --parent a3f7
+add note "Remember this"
 ```
 
-**Rule**: Title must come immediately after the shortcut noun.
+**Title must come immediately after the shortcut, before any flags.**
 
-```bash
-✅ add task "Title" --status active    # Correct
-❌ add task --status active "Title"    # Wrong (title becomes body)
-```
+Default shortcuts: `task`, `project`, `item`, `note`, `milestone`, `idea`, `location`, `contact`, `reference`, `resource`
 
-### Common Shortcuts
-
-```bash
-add task "Buy milk"
-add project "Q1 Goals"
-add location "Conference Room A"
-add note "Remember to..."
-add milestone "v1.0 Release"
-add idea "Feature: Dark mode"
-```
-
-### With Flags
-
-```bash
-add task "Review PR" --status active
-add task "Deploy" --assignee alice --due 2026-03-15
-add project "Website" --status planning --assignee bob
-add location "Room 203" --parent "//building[@name='HQ']"
-```
+Add custom shortcuts in `config/shortcuts.yaml`.
 
 ---
 
-## 📝 Full Syntax (Always Works)
-
-```bash
-# Traditional format
-add --tag task --topic "Buy milk"
-add --tag project --title "Q1 Goals" --status planning
-add --tag item --topic "Chair" --parent a3f7
-```
-
-**Note**: Use `--topic` or `--title` (they're aliases)
-
----
-
-## 🔍 Finding Nodes
-
-### By XPath
-
-```bash
-find //task
-find "//task[@status='active']"
-find "//project[@title='Website']//task"
-```
-
-### By ID
-
-```bash
-find a3f7b2c1              # Full ID
-find a3f7                  # Prefix (shows selection if multiple)
-```
-
-### With View Formats
-
-```bash
-find //task --view tree    # Hierarchical (default)
-find //task --view table   # Tabular
-find //task --view compact # Minimal
-```
-
----
-
-## ✏️ Editing Nodes
-
-### By ID
-
-```bash
-edit a3f7 --status done
-edit a3f7 --status done --assignee charlie
-edit a3f7 --clear-due      # Remove attribute
-```
-
-### By XPath
-
-```bash
-edit "//task[@title='Review']" --status in_progress
-```
-
----
-
-## 📂 File Operations
-
-### Load
+## File Operations
 
 ```bash
 load project.xml
-load project.xml --autosc  # Auto-save on changes
-load backup.7z             # Encrypted (prompts for password)
-```
+load project.xml --autosc       # create sidecar if missing
+load project.xml --rebuildsc    # force-rebuild sidecar on load
+load backup.7z                  # encrypted (prompts for password)
 
-### Save
+save                            # overwrite current file
+save backup.xml                 # save to new file
+save backup.7z                  # save encrypted
 
-```bash
-save                       # Save to current file
-save backup.xml            # Save as new file
-save backup.7z             # Encrypt with password
-```
+backup                          # → project.bkp.xml
+backup --timestamp              # → project.20260301_143022.xml
+backup mybackup.xml             # custom name
+backup --force                  # overwrite without prompting
 
-### List
-
-```bash
-list                       # Tree view (default)
-list --view table          # Table view
-list --view compact        # Compact view
+restore project.bkp.xml         # load backup; then use save to write back
 ```
 
 ---
 
-## 🗑️ Deleting
+## Add Nodes
 
 ```bash
-delete a3f7
-delete "//task[@status='cancelled']"
-```
+# Shortcut
+add task "Review PR"
+add task "Deploy" --status active --resp alice --due 2026-03-15
+add task "Subtask" --parent a3f7
+add task "In project" --parent "//project[@topic='Q1']"
 
----
+# Full syntax
+add --tag task --topic "Review PR"
+add --tag item --topic "Chair" -a colour=blue -a condition=new
 
-## 🎯 Common Workflows
-
-### Create Task Hierarchy
-
-```bash
-# Create project
-add project "Website Redesign" --status planning
-
-# Add tasks (get project ID, e.g., a3f7)
-find //project
-
-# Add tasks under project
-add task "Design mockups" --parent a3f7 --assignee alice
-add task "Implement frontend" --parent a3f7 --assignee bob
-add task "Write tests" --parent a3f7 --assignee charlie
-```
-
-### Track Progress
-
-```bash
-# Find active tasks
-find "//task[@status='active']"
-
-# Complete a task
-edit a3f7 --status done
-
-# Reassign a task
-edit b2c8 --assignee new_person
-```
-
-### Add Location Hierarchy
-
-```bash
-# Building
-add location "Main Office"
-
-# Rooms (get building ID, e.g., d4e9)
-add location "Conference Room A" --parent d4e9
-add location "Conference Room B" --parent d4e9
-add location "Storage" --parent d4e9
-```
-
----
-
-## 🏷️ Attributes Reference
-
-### Standard Attributes
-
-| Attribute     | Shortcut | Full         | Aliases   | Example             |
-| ------------- | -------- | ------------ | --------- | ------------------- |
-| **Title**     | Yes      | `--topic`    | `--title` | `--topic "My Task"` |
-| **Status**    | No       | `--status`   | -         | `--status active`   |
-| **Assignee**  | No       | `--assignee` | `--resp`  | `--assignee alice`  |
-| **Due Date**  | No       | `--due`      | -         | `--due 2026-03-15`  |
-| **Parent**    | No       | `--parent`   | -         | `--parent a3f7`     |
-| **Custom ID** | No       | `--id`       | -         | `--id custom123`    |
-
-### Custom Attributes
-
-```bash
-# Use -a or --attr (repeatable)
-add task "Deploy" -a priority=high -a team=backend
-add task "Review" --attr severity=critical --attr platform=web
-```
-
----
-
-## 🔧 ID Shortcuts
-
-### Full ID
-
-```bash
-edit a3f7b2c1 --status done    # Exact match
-```
-
-### ID Prefix
-
-```bash
-edit a3f --status done         # Prefix match
-# If multiple matches:
-#   [1] a3f7b2c1 - Task: Review PR
-#   [2] a3f9d4e2 - Task: Update docs
-#   Select: 1
-```
-
-### Disable Auto-ID
-
-```bash
+# Custom / disable ID
 add task "No ID" --id False
-```
-
-### Custom ID
-
-```bash
-add task "Custom" --id my-custom-id
+add task "Custom" --id my-id-123
 ```
 
 ---
 
-## 🎨 View Formats
-
-### Tree View (Default)
+## Edit & Delete
 
 ```bash
-list
-# Output:
-# ├── project: Website
-# │   ├── task: Design
-# │   └── task: Code
-```
+# Edit
+edit a3f7 --status done
+edit a3f --topic "Updated"          # ID prefix (interactive if multiple)
+edit "//task[@status='pending']" --status active
+edit a3f7 --text "New body text"
+edit a3f7 -a priority=high
 
-### Table View
+# Delete (three equivalent forms)
+delete a3f7
+del a3f7
+remove a3f7
+delete "//task[@status='cancelled']"
 
-```bash
-list --view table
-# Output:
-# ID       | Tag     | Title    | Status
-# ---------|---------|----------|--------
-# a3f7b2c1 | task    | Design   | active
-# b8d4e9f2 | task    | Code     | pending
-```
-
-### Compact View
-
-```bash
-list --view compact
-# Output:
-# a3f7: task "Design" [active]
-# b8d4: task "Code" [pending]
+# Delete via edit
+edit a3f7 --delete
 ```
 
 ---
 
-## 🔒 Advanced Features
-
-### Wrap Nodes
+## View & Search
 
 ```bash
-# Wrap all top-level nodes under new parent
-wrap --tag archive --topic "2025 Archive"
-```
+# List
+list                                # full tree
+list --style table
+list --depth 2
+list "//task[@status='active']"
 
-### Merge Files
+# Find by ID prefix (needs sidecar)
+find a3f
+find a3f --tree                     # show full subtrees
+find a3f --tree --depth 2
 
-```bash
-merge other.xml                    # Default: union strategy
-merge backup.xml --strategy source_wins
-```
-
-### Rebuild Sidecar
-
-```bash
-rebuild                            # After manual XML edits
-```
-
-### Toggle Auto-ID
-
-```bash
-autoid on                          # Enable (default)
-autoid off                         # Disable
+# Show single node in detail
+show a3f7
+show "//project[1]"
 ```
 
 ---
 
-## 📋 XPath Quick Reference
-
-### Basic Selectors
+## Calendar Export
 
 ```bash
-//task                     # All tasks
-//project                  # All projects
-//*                        # All nodes
+export-calendar "//task[@due]" tasks.ics
+export-calendar "//task[@due][@status='active']" active.ics --name "Active Tasks"
+export-calendar a3f my-task.ics     # by ID prefix
+export-calendar a3f7b2c1 task.ics   # by full ID
 ```
 
-### Attribute Filters
+Elements must have a `due="YYYY-MM-DD"` attribute to be exported.
+
+---
+
+## DataFrame Commands
+
+Requires `pip install pandas`.
 
 ```bash
-//task[@status='active']              # Status equals
-//task[@assignee='alice']             # Assignee equals
-//project[@title='Website']           # Title equals
-```
+to_df                               # preview entire manifest as DataFrame
+to_df --save all.csv
+to_df "//task[@status='active']" --save active.csv
+to_df --no-text --save meta.csv     # faster, metadata only
 
-### Nested Selection
+find_df "//task[@status='active']"
+find_df "//task[@due]" --save due.csv
 
-```bash
-//project//task                       # Tasks inside projects
-//project[@title='Website']//task     # Tasks in specific project
-```
-
-### Multiple Conditions
-
-```bash
-//task[@status='active'][@assignee='alice']     # AND
-//task[@status='active' or @status='pending']   # OR
+from_df updated.csv
+from_df updated.csv --parent "//project[@id='p1']"
+from_df updated.csv --dry-run       # preview only
 ```
 
 ---
 
-## ⚙️ Configuration
-
-### Shortcuts Config
-
-**File**: `config/shortcuts.yaml`
-
-```yaml
-shortcuts:
-  - task
-  - project
-  - location
-  - your_custom      # Add here!
-
-reserved_keywords:
-  - help
-  - exit
-  # Never add "add"!
-```
-
-### Add Custom Shortcut
-
-1. Edit `config/shortcuts.yaml`
-2. Add shortcut to list
-3. Reload shell: `exit` then `manifest`
-4. Use: `add your_custom "Title"`
-
----
-
-## 🐛 Troubleshooting
-
-### Shortcut Not Working
+## Structure & Maintenance
 
 ```bash
-# Check config
-cat config/shortcuts.yaml
-
-# Verify shortcut is listed
-# Reload shell
-exit
-manifest
-```
-
-### Module Not Found
-
-```bash
-# Reinstall
-pip install -e .
-```
-
-### Lock Timeout
-
-```
-# Another process is using the file
-# Wait or kill the other process
-```
-
-### XPath Syntax Error
-
-```bash
-# ❌ Wrong (missing quotes)
-find //task[@status=active]
-
-# ✅ Correct
-find "//task[@status='active']"
+wrap --root archive                 # wrap all top-level nodes under <archive>
+merge other.xml                     # import all nodes from another file
+autoid                              # add IDs to nodes that lack one
+autoid --overwrite                  # replace all IDs
+rebuild                             # sync sidecar with current XML
+cheatsheet                          # print this sheet
 ```
 
 ---
 
-## 💡 Tips & Tricks
-
-### 1. Use ID Prefixes
+## XPath Quick Reference
 
 ```bash
-# Instead of typing full ID
-edit a3f7b2c1
-
-# Just type prefix
-edit a3f
-```
-
-### 2. Combine Shortcuts with Flags
-
-```bash
-# Shortcut + multiple flags
-add task "Important" --status active --assignee alice --due 2026-03-15
-```
-
-### 3. Use Auto-Save
-
-```bash
-# Load with auto-save
-load project.xml --autosc
-
-# Every change saves automatically
-add task "Auto-saved"
-```
-
-### 4. Batch Operations
-
-```bash
-# Use shell loops
-for name in Alice Bob Charlie; do
-    add task "Review for $name" --assignee $name
-done
-```
-
-### 5. Complex XPath Queries
-
-```bash
-# Find all active tasks assigned to Alice
-find "//task[@status='active'][@assignee='alice']"
-
-# Find all tasks in Website project
-find "//project[@title='Website']//task"
+/*                                  # all top-level nodes
+//task                              # all task elements
+//task[@status='active']            # tasks with status=active
+//task[@due]                        # tasks that have a due attribute
+//project//task                     # tasks anywhere inside a project
+//task[@status='active'][@resp='alice']   # multiple conditions
+//*[contains(@topic,'bug')]         # topic contains 'bug'
 ```
 
 ---
 
-## 📊 Default Shortcuts
+## ID Selector Rules
 
-| Shortcut    | Use Case        | Example                    |
-| ----------- | --------------- | -------------------------- |
-| `task`      | Tasks/todos     | `add task "Review PR"`     |
-| `project`   | Projects        | `add project "Q1 Goals"`   |
-| `item`      | Generic items   | `add item "Office chair"`  |
-| `note`      | Notes/reminders | `add note "Call client"`   |
-| `milestone` | Milestones      | `add milestone "v1.0"`     |
-| `idea`      | Ideas           | `add idea "Dark mode"`     |
-| `location`  | Places          | `add location "Room 203"`  |
-| `contact`   | People          | `add contact "John Doe"`   |
-| `reference` | Links/docs      | `add reference "API docs"` |
-
----
-
-## 🎓 Learning Path
-
-### Beginner
-
-1. Load a file: `load test.xml`
-2. Add items: `add task "My First Task"`
-3. List items: `list`
-4. Save: `save`
-
-### Intermediate
-
-1. Use shortcuts with flags: `add task "Task" --status active`
-2. Edit by ID prefix: `edit a3f --status done`
-3. Find with XPath: `find "//task[@status='active']"`
-4. Use custom attributes: `add task "Task" -a priority=high`
-
-### Advanced
-
-1. Complex XPath: `find "//project[@status='planning']//task[@assignee='alice']"`
-2. Wrap operations: `wrap --tag archive --topic "Old"`
-3. Merge files: `merge backup.xml`
-4. Custom shortcuts: Edit `config/shortcuts.yaml`
-
----
-
-## 📞 Quick Help
-
-### In Shell
+A string is treated as an ID prefix when it is 3–8 hex characters with no `/`, `[`, `@`, `*`, or `=`.  
+Use `--id` or `--xpath` to force interpretation.
 
 ```bash
-help                    # List all commands
-help add                # Help for specific command
-cheatsheet              # Show this cheatsheet
+edit a3f --status done              # ID prefix → auto-detects
+edit "//task[@id='a3f7b2c1']" ...   # XPath → explicit
+edit a3f7b2c1 --id --status done    # force ID
 ```
 
-### Documentation
+---
 
-- `README.md` - Full project documentation
-- `API.md` - Complete API reference
-- `TEST_PHASE3_GUIDE.md` - Testing guide
+## Status Values
+
+`active` · `done` · `pending` · `blocked` · `cancelled`
 
 ---
 
-## 🔑 Keyboard Shortcuts
+## Tips
 
-| Key      | Action                            |
-| -------- | --------------------------------- |
-| `↑`      | Previous command                  |
-| `↓`      | Next command                      |
-| `Tab`    | Command completion (if supported) |
-| `Ctrl+C` | Cancel current command            |
-| `Ctrl+D` | Exit shell                        |
+- Load with `--autosc` to enable `find` and ID-based `edit`/`delete`/`show`
+- After loading an old file without `--autosc`, run `rebuild` to enable ID lookups
+- `exit` warns on unsaved changes; run it again to force-quit
+- Ctrl+D also exits
 
 ---
 
-## ✅ Checklist for New Users
-
-- [ ] Install: `pip install -e .`
-- [ ] Load file: `load test.xml`
-- [ ] Try shortcut: `add task "Test"`
-- [ ] List items: `list`
-- [ ] Edit item: `edit <id> --status done`
-- [ ] Save: `save`
-- [ ] Add custom shortcut to config
-- [ ] Read full docs: `README.md`, `API.md`
-
----
-
-**Last Updated**: February 2026 | **Version**: 3.5.0
-
-*Print this page for quick reference!*
+*Last updated: March 2026*

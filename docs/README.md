@@ -2,7 +2,7 @@
 
 **Version**: 3.5.0  
 **Status**: Phase 3 Complete  
-**Last Updated**: February 2026
+**Last Updated**: March 2026
 
 ---
 
@@ -54,14 +54,14 @@ add --tag location --topic "Conference Room A"
 
 ### 🔧 Phase 2: Vocabulary Harmonization
 
-**Unified terminology** across both tools:
+**Consistent flag names** used across commands:
 
-| Old (varied) | New (standard) | Aliases |
-|--------------|----------------|---------|
-| `--topic` (Manifest) | `--title` | Both work |
-| `--title` (Scheduler) | `--title` | Primary |
-| `--resp` (Manifest) | `--assignee` | Both work |
-| `--assignee` (Scheduler) | `--assignee` | Primary |
+| Attribute | Flag | Notes |
+|---|---|---|
+| Topic / title | `--topic` | Use for node title in `add` and `edit` |
+| Responsible party | `--resp` | Use for assignee in `add` and `edit` |
+| Due date | `--due` | Format: `YYYY-MM-DD` |
+| Status | `--status` | Common values: `active`, `done`, `pending`, `blocked`, `cancelled` |
 
 ### 📦 Phase 1: Shared Infrastructure
 
@@ -149,13 +149,13 @@ manifest
 add task "Buy groceries"
 
 # With flags
-add task "Important task" --status active --assignee alice
+add task "Important task" --status active --resp alice
 
 # With parent location
 add task "Subtask" --parent a3f7
 
 # Multiple attributes
-add project "Q1 Goals" --status planning --assignee bob --due 2026-03-31
+add project "Q1 Goals" --status planning --resp bob --due 2026-03-31
 ```
 
 ### Full Syntax (Still Works!)
@@ -186,15 +186,23 @@ manifest/
 │   │       └── ics_writer.py   # ICS export
 │   └── manifest_manager/       # Manifest Manager package
 │       ├── __init__.py
-│       ├── manifest.py         # CLI shell
-│       ├── manifest_core.py    # Core logic
-│       └── storage.py          # Storage layer
+│       ├── manifest.py                 # CLI shell
+│       ├── manifest_core.py            # Core logic
+│       ├── storage.py                  # Storage layer
+│       ├── calendar.py                 # Calendar export helpers
+│       ├── config.py                   # Per-file config
+│       ├── id_sidecar.py               # ID sidecar index
+│       ├── dataframe_conversion.py     # XML ↔ DataFrame (v3.5)
+│       └── dataframe_commands.py       # to_df / find_df / from_df (v3.5)
 ├── tests/
 │   ├── shared/                 # Tests for shared code
 │   │   ├── test_id_generator.py
 │   │   ├── test_ics_writer.py
 │   │   └── test_locking.py
-│   └── test_phase3_shortcuts.py  # Shortcut tests
+│   │   ├── test_phase3_shortcuts.py
+│   ├── test_dataframe_conversion.py
+│   ├── test_export_calendar_ids.py
+│   └── ... (see tests/ directory)
 ├── docs/
 │   ├── API.md                  # API documentation
 │   ├── CHEATSHEET.md           # Quick reference

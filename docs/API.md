@@ -1,7 +1,7 @@
 # Manifest Manager API Documentation
 
 **Version**: 3.5.0  
-**Last Updated**: February 2026
+**Last Updated**: March 2026
 
 ---
 
@@ -9,939 +9,628 @@
 
 1. [Command Reference](#command-reference)
 2. [Shortcut System](#shortcut-system)
-3. [Shared Infrastructure](#shared-infrastructure)
-4. [Python API](#python-api)
-5. [Configuration](#configuration)
-6. [Advanced Usage](#advanced-usage)
+3. [DataFrame Commands](#dataframe-commands)
+4. [Shared Infrastructure](#shared-infrastructure)
+5. [Python API](#python-api)
+6. [Configuration](#configuration)
 
 ---
 
 ## Command Reference
 
-### Core Commands
+### File Commands
 
 #### `load`
 
-Load a manifest file (XML or encrypted 7z).
+Load a manifest file (XML or encrypted 7z). Creates a new file if the path does not exist.
 
-**Syntax:**
-
-```bash
-load <filename> [--autosc] [--autoid]
+```
+load <filename> [--autosc] [--rebuildsc]
 ```
 
-**Options:**
-
-- `--autosc` - Auto-save on changes
-- `--autoid` - Enable automatic ID generation
-
-**Examples:**
+| Option | Description |
+|---|---|
+| `--autosc` | Auto-create ID sidecar if missing |
+| `--rebuildsc` | Force-rebuild sidecar from XML on load |
 
 ```bash
-load project.xml
-load project.xml --autosc
-load backup.7z  # Prompts for password
-```
-
----
-
-#### `add`
-
-Add a new node to the manifest.
-
-**Shortcut Syntax** (v3.5+):
-
-```bash
-add <shortcut> "Title" [--flags]
-```
-
-**⚠️ Important**: The title must come immediately after the shortcut noun.
-
-✅ **Correct order**:
-
-```bash
-add task "Buy Milk" --status active
-# Expands to: --tag task --topic "Buy Milk" --status active
-```
-
-❌ **Wrong order** (flags before title):
-
-```bash
-add task --status active "Buy Milk"
-# Expands to: --tag task --status active "Buy Milk"
-# Result: "Buy Milk" becomes body text, not the topic!
-```
-
-**Workaround**: Use full syntax if you need flags first:
-
-```bash
-add --tag task --status active --topic "Buy Milk"
-```
-
-**Full Syntax**:
-
-```bash
-add --tag <tag> [--topic "Title"] [--flags]
-```
-
-**Options:**
-
-- `--tag <name>` - Node tag name (required in full syntax)
-- `--topic <text>` - Topic/title text
-- `--title <text>` - Alias for --topic (v3.4+)
-- `--status <value>` - Status value
-- `--resp <name>` - Responsible party (legacy)
-- `--assignee <name>` - Assignee (v3.4+, alias for --resp)
-- `--due <date>` - Due date (YYYY-MM-DD)
-- `--parent <selector>` - Parent location (XPath or ID)
-- `--id <value>` - Custom ID (default: auto-generated)
-- `--id False` - Disable auto-ID
-- `-a, --attr <k=v>` - Additional attributes (repeatable)
-- `text` - Body text content
-
-**Shortcut Examples:**
-
-```bash
-# Basic
-add task "Buy groceries"
-
-# With status
-add task "Review PR" --status active
-
-# With assignee
-add task "Deploy" --assignee alice
-
-# With due date
-add task "Submit report" --due 2026-03-15
-
-# With parent (using ID)
-add task "Subtask" --parent a3f7
-
-# With parent (using XPath)
-add task "Feature task" --parent "//project[@title='Website']"
-
-# Multiple flags
-add project "Q1 Goals" --status planning --assignee bob --due 2026-03-31
-
-# Custom attributes
-add task "Database migration" -a priority=high -a team=backend
-```
-
-**Full Syntax Examples:**
-
-```bash
-# Traditional syntax (still works)
-add --tag task --topic "Buy groceries"
-add --tag project --title "Q1 Goals" --status planning
-add --tag item --topic "Office supplies" --parent "//location[@title='Storage']"
-```
-
-**Parent Selector Detection:**
-
-- Contains `/` → XPath
-- Hex-like (3-8 chars) → ID prefix
-- Exact match in sidecar → Full ID
-
----
-
-#### `edit`
-
-Modify an existing node.
-
-**Syntax:**
-
-```bash
-edit <selector> [--flags]
-```
-
-**Selector Types:**
-
-- Full ID: `a3f7b2c1`
-- ID prefix: `a3f7` (shows selection if multiple matches)
-- XPath: `//task[@status='active']`
-
-**Options:**
-
-- Same as `add` command (except --tag)
-- `--clear-<attr>` - Remove an attribute
-
-**Examples:**
-
-```bash
-# Edit by full ID
-edit a3f7b2c1 --status done
-
-# Edit by ID prefix
-edit a3f --status in_progress
-
-# Edit by XPath
-edit "//task[@title='Review PR']" --assignee charlie
-
-# Clear an attribute
-edit a3f7 --clear-due
-
-# Multiple changes
-edit a3f7 --status done --resp alice --topic "Updated title"
-```
-
----
-
-#### `find`
-
-Search for nodes using XPath or ID.
-
-**Syntax:**
-
-```bash
-find <selector> [--view <format>]
-```
-
-**Selector Types:**
-
-- XPath: `//task[@status='active']`
-- ID: `a3f7b2c1`
-- ID prefix: `a3f`
-
-**View Formats:**
-
-- `tree` (default) - Hierarchical tree view
-- `table` - Tabular view
-- `compact` - Minimal output
-
-**Examples:**
-
-```bash
-# Find by tag
-find //task
-
-# Find by attribute
-find "//task[@status='active']"
-
-# Find by ID prefix
-find a3f
-
-# Complex XPath
-find "//project[@status='planning']//task[@assignee='alice']"
-
-# With view format
-find //task --view table
-find //project --view compact
-```
-
----
-
-#### `list`
-
-List all nodes in the manifest.
-
-**Syntax:**
-
-```bash
-list [--view <format>]
-```
-
-**View Formats:**
-
-- `tree` (default)
-- `table`
-- `compact`
-
-**Examples:**
-
-```bash
-list
-list --view table
-list --view compact
+load myproject.xml
+load myproject.xml --autosc
+load myproject.xml --rebuildsc
+load backup.7z                  # Prompts for password
 ```
 
 ---
 
 #### `save`
 
-Save the current manifest.
+Save the current manifest. Encrypts automatically when the filename ends in `.7z`.
 
-**Syntax:**
-
-```bash
-save [filename] [--encrypt]
+```
+save [filename]
 ```
 
-**Options:**
+```bash
+save                    # Overwrite current file
+save backup.xml         # Save to new file
+save backup.7z          # Save encrypted (prompts for password)
+```
 
-- `filename` - Save as different file
-- `--encrypt` - Save as encrypted 7z
+---
 
-**Examples:**
+#### `backup`
+
+Create a backup copy of the current manifest without changing the active file.
+
+```
+backup [filename] [--timestamp] [--force] [--no-sidecar]
+```
+
+| Option | Description |
+|---|---|
+| `filename` | Custom backup path (default: `<name>.bkp.<ext>`) |
+| `--timestamp`, `-t` | Use timestamp in filename instead of `.bkp` |
+| `--force`, `-f` | Overwrite existing backup without prompting |
+| `--no-sidecar` | Skip sidecar backup |
 
 ```bash
-save                    # Save to current file
-save backup.xml         # Save as new file
-save backup.7z          # Save as encrypted 7z (prompts for password)
+backup                              # → project.bkp.xml
+backup --timestamp                  # → project.20260301_143022.xml
+backup archive.xml                  # Custom name
+backup --timestamp --force          # Overwrite silently
+```
+
+---
+
+#### `restore`
+
+Load a backup file into memory. Use `save <original>` afterward to write back.
+
+```
+restore <filename>
+```
+
+```bash
+restore project.bkp.xml
+restore project.20260301_143022.xml
+```
+
+---
+
+### Node Commands
+
+#### `add`
+
+Add a new node. Supports shortcut syntax (see [Shortcut System](#shortcut-system)).
+
+**Shortcut syntax:**
+```
+add <shortcut> ["Title"] [options]
+```
+
+**Full syntax:**
+```
+add --tag <name> [options]
+```
+
+| Option | Description |
+|---|---|
+| `--tag <name>` | Tag name (required in full syntax) |
+| `--topic <text>` | Topic / title attribute |
+| `--status <value>` | Status attribute |
+| `--resp <name>` | Responsible party |
+| `--due <YYYY-MM-DD>` | Due date |
+| `--parent <selector>` | Parent XPath or ID prefix (default: `/*`) |
+| `--parent-xpath` | Force XPath interpretation of `--parent` |
+| `--parent-id` | Force ID interpretation of `--parent` |
+| `--id <value>` | Custom ID |
+| `--id False` | Disable auto-ID for this node |
+| `-a <key=value>` | Custom attribute (repeatable) |
+| `text` | Body text content (positional) |
+
+```bash
+# Shortcut
+add task "Review PR"
+add task "Deploy" --status active --resp alice --due 2026-03-15
+add task "Subtask" --parent a3f7
+add task "In project" --parent "//project[@topic='Q1']"
+
+# Full syntax
+add --tag task --topic "Review PR"
+add --tag task --topic "Deploy" --status active --resp alice
+add --tag item --topic "Chair" -a colour=blue -a condition=new
+```
+
+---
+
+#### `edit`
+
+Modify an existing node. Selector is auto-detected as ID or XPath.
+
+```
+edit <selector> [options]
+```
+
+| Option | Description |
+|---|---|
+| `--topic <text>` | Update topic |
+| `--status <value>` | Update status |
+| `--resp <name>` | Update responsible party |
+| `--due <YYYY-MM-DD>` | Update due date |
+| `--text <text>` | Update body text |
+| `-a <key=value>` | Add / update attribute (repeatable) |
+| `--delete` | Delete matched node(s) |
+| `--id` | Force ID interpretation of selector |
+| `--xpath` | Force XPath interpretation of selector |
+
+```bash
+edit a3f7b2c1 --status done
+edit a3f --topic "Updated title"        # ID prefix (interactive if multiple)
+edit "//task[@status='pending']" --status active
+edit a3f --delete                       # Delete via edit
 ```
 
 ---
 
 #### `delete`
 
-Delete a node.
+Delete a node and all its descendants. Aliases: `del`, `remove`.
 
-**Syntax:**
-
-```bash
-delete <selector>
 ```
-
-**Examples:**
+delete <selector> [--id] [--xpath]
+```
 
 ```bash
 delete a3f7
+delete a3f                              # ID prefix (interactive if multiple)
 delete "//task[@status='cancelled']"
 ```
 
 ---
 
-#### `wrap`
+#### `show`
 
-Wrap top-level nodes under a new parent.
+Display full details of a single node: all attributes, text, and a tree of children.
 
-**Syntax:**
-
-```bash
-wrap --tag <tag> --topic "Title"
+```
+show <selector> [--id] [--xpath]
 ```
 
-**Examples:**
+```bash
+show a3f7b2c1
+show a3f                                # ID prefix
+show "//project[1]"
+```
+
+---
+
+### Search & View Commands
+
+#### `find`
+
+Find nodes by ID prefix. Uses the sidecar index (requires `--autosc` on load).
+
+```
+find <prefix> [--tree] [--depth N]
+```
+
+| Option | Description |
+|---|---|
+| `prefix` | ID prefix to search |
+| `--tree` | Show full subtree for each match |
+| `--depth N` | Limit tree depth |
 
 ```bash
-wrap --tag project --topic "Archive 2025"
+find a3f
+find a3f --tree
+find a3f --tree --depth 2
+```
+
+---
+
+#### `list`
+
+Display nodes in the manifest.
+
+```
+list [selector] [--style tree|table] [--depth N] [--id] [--xpath]
+```
+
+| Option | Description |
+|---|---|
+| `selector` | ID prefix or XPath (default: `/*`) |
+| `--style tree` | Hierarchical view (default) |
+| `--style table` | Columnar view |
+| `--depth N` | Limit display depth |
+| `--id` | Force ID interpretation |
+| `--xpath` | Force XPath interpretation |
+
+```bash
+list
+list --style table
+list --depth 2
+list "//task[@status='active']"
+list a3f --style tree
+```
+
+---
+
+#### `export-calendar`
+
+Export nodes with `due` attributes to an iCalendar `.ics` file.
+
+```
+export-calendar <selector> <output.ics> [--name NAME] [--id] [--xpath]
+```
+
+| Option | Description |
+|---|---|
+| `selector` | XPath, full ID, or ID prefix |
+| `output.ics` | Output file path |
+| `--name NAME` | Calendar name (default: `"Manifest Tasks"`) |
+| `--id` | Force ID interpretation |
+| `--xpath` | Force XPath interpretation |
+
+```bash
+export-calendar "//task[@due]" tasks.ics
+export-calendar "//task[@due][@status='active']" active.ics --name "Active Tasks"
+export-calendar a3f my-task.ics         # Export by ID prefix
+export-calendar a3f7b2c1 my-task.ics   # Export by full ID
+```
+
+---
+
+### Structure Commands
+
+#### `wrap`
+
+Wrap all top-level nodes under a new container element.
+
+```
+wrap --root <tag>
+```
+
+```bash
+wrap --root archive
+wrap --root project
 ```
 
 ---
 
 #### `merge`
 
-Merge another manifest file into the current one.
+Merge all nodes from another manifest file into the current one.
 
-**Syntax:**
-
-```bash
-merge <filename> [--strategy <strategy>]
 ```
-
-**Strategies:**
-
-- `union` - Combine all (default)
-- `source_wins` - Source wins conflicts
-- `target_wins` - Target wins conflicts
-
-**Examples:**
+merge <filename>
+```
 
 ```bash
 merge other.xml
-merge backup.xml --strategy source_wins
+merge backup.7z             # Prompts for password
 ```
 
 ---
 
-### Utility Commands
-
-#### `rebuild`
-
-Rebuild the ID sidecar index.
-
-**Syntax:**
-
-```bash
-rebuild
-```
-
-**When to use:**
-
-- After manual XML edits
-- After merge operations
-- To verify sidecar consistency
-
----
+### Maintenance Commands
 
 #### `autoid`
 
-Configure automatic ID generation.
+Add IDs to elements that lack them.
 
-**Syntax:**
-
-```bash
-autoid [on|off]
+```
+autoid [--overwrite]
 ```
 
-**Examples:**
+| Option | Description |
+|---|---|
+| `--overwrite` | Replace all existing IDs (default: skip elements that already have one) |
 
 ```bash
-autoid on
-autoid off
+autoid
+autoid --overwrite
+```
+
+---
+
+#### `rebuild`
+
+Rebuild the ID sidecar index from the current in-memory XML. Use when IDs exist in the XML but the sidecar is missing or stale.
+
+```
+rebuild
 ```
 
 ---
 
 #### `cheatsheet`
 
-Display quick reference guide.
-
-**Syntax:**
-
-```bash
-cheatsheet
-```
+Print the quick-reference cheatsheet.
 
 ---
 
 #### `exit`
 
-Exit the shell (with unsaved changes warning).
-
-**Syntax:**
-
-```bash
-exit
-```
+Exit the shell. Warns if there are unsaved changes; run `exit` a second time to force quit. `Ctrl+D` also exits.
 
 ---
 
 ## Shortcut System
 
-### Overview
+Shortcuts let you omit `--tag` and `--topic` for common tag names:
 
-Shortcuts allow you to type less for common operations:
-
-```bash
-# Shortcut (v3.5+)
+```
 add task "Title"
-
-# Expands to:
+# expands to:
 add --tag task --topic "Title"
 ```
 
-### How It Works
+**Rule:** the title must come immediately after the shortcut noun, before any flags.
 
-**Detection Logic:**
+```bash
+# Correct
+add task "Title" --status active
 
-1. First word is a known shortcut?
-2. First word doesn't start with `--`?
-3. → Expand to full syntax
-
-**Expansion Rules:**
-
-```
-add <shortcut> "Title" [--flags]
-  ↓
-add --tag <shortcut> --topic "Title" [--flags]
+# Wrong — "Title" becomes body text, not topic
+add task --status active "Title"
 ```
 
-### Default Shortcuts
+### Default shortcuts
 
-| Shortcut    | Description     | Example                              |
-| ----------- | --------------- | ------------------------------------ |
-| `task`      | Task items      | `add task "Review PR"`               |
-| `project`   | Projects        | `add project "Q1 Goals"`             |
-| `item`      | Generic items   | `add item "Office chair"`            |
-| `note`      | Notes/reminders | `add note "Remember to..."`          |
-| `milestone` | Milestones      | `add milestone "v1.0 Release"`       |
-| `idea`      | Ideas           | `add idea "Feature: Dark mode"`      |
-| `location`  | Locations       | `add location "Conference Room A"`   |
-| `contact`   | Contacts        | `add contact "John Doe"`             |
-| `reference` | References      | `add reference "Documentation link"` |
+`task`, `project`, `item`, `note`, `milestone`, `idea`, `location`, `contact`, `reference`, `resource`
 
 ### Configuration
 
-**File**: `config/shortcuts.yaml`
+**File:** `config/shortcuts.yaml`
 
 ```yaml
 shortcuts:
   - task
   - project
-  - location
-  - your_custom_shortcut  # Add here!
+  - my_custom_tag    # add yours here
 
 reserved_keywords:
   - help
   - exit
-  # Don't add "add" here!
+  - save
+  - list
+  - find
+  - edit
+  - delete
 ```
 
-### Adding Custom Shortcuts
+Reload the shell after editing the file.
 
-1. Edit `config/shortcuts.yaml`
-2. Add your shortcut to the list
-3. Reload the shell
-4. Use it: `add your_shortcut "Title"`
+---
 
-### Reserved Keywords
+## DataFrame Commands
 
-These words **cannot** be shortcuts:
+Requires `pandas` (`pip install pandas`). Injected at startup; silently unavailable if pandas is not installed.
 
-- `help`, `exit`, `quit`
-- `save`, `load`
-- `list`, `find`, `edit`, `delete`
+#### `to_df`
 
-**Note**: `add` is NOT reserved (it's the command itself).
+Convert the loaded manifest (or an XPath subtree) to a DataFrame, with optional CSV export.
+
+```
+to_df [xpath] [--save FILE] [--no-text]
+```
+
+| Option | Description |
+|---|---|
+| `xpath` | Optional XPath to select a subtree (default: entire manifest) |
+| `--save FILE` | Write CSV instead of printing preview |
+| `--no-text` | Omit text column (faster for metadata-only exports) |
+
+```bash
+to_df
+to_df --save all.csv
+to_df "//task[@status='active']" --save active.csv
+to_df --no-text --save meta.csv
+```
+
+---
+
+#### `find_df`
+
+Execute an XPath query and display or save results as a DataFrame.
+
+```
+find_df <xpath> [--save FILE]
+```
+
+```bash
+find_df "//task[@status='active']"
+find_df "//task[@due]" --save due_tasks.csv
+```
+
+---
+
+#### `from_df`
+
+Import a CSV (previously exported by `to_df` or `find_df`) back into the manifest.
+
+```
+from_df <file> [--parent XPATH] [--dry-run]
+```
+
+| Option | Description |
+|---|---|
+| `file` | CSV file to import |
+| `--parent XPATH` | Attach imported nodes under this XPath (default: replace manifest root children) |
+| `--dry-run` | Preview without modifying |
+
+```bash
+from_df tasks.csv
+from_df updated.csv --parent "//project[@id='p1']"
+from_df updated.csv --dry-run
+```
 
 ---
 
 ## Shared Infrastructure
 
-### ID Generator
-
-**Module**: `shared.id_generator`
+### ID Generator — `shared.id_generator`
 
 #### `generate_id(prefix="", length=8)`
 
 Generate a unique hexadecimal ID.
 
-**Parameters:**
-
-- `prefix` (str): Optional prefix (e.g., "t" for task)
-- `length` (int): Length of hex part (default: 8)
-
-**Returns:** String ID
-
-**Examples:**
-
 ```python
 from shared.id_generator import generate_id
 
-# Default
-id = generate_id()  # "a3f7b2c1"
-
-# With prefix
-task_id = generate_id(prefix="t", length=5)  # "t12345"
-
-# Custom length
-short_id = generate_id(length=4)  # "a3f7"
+generate_id()                    # "a3f7b2c1"
+generate_id(prefix="t", length=5)  # "t1a2b3"
 ```
 
 #### `validate_id(id_str, prefix=None, min_length=3)`
 
-Validate ID format.
-
-**Parameters:**
-
-- `id_str` (str): ID to validate
-- `prefix` (str, optional): Expected prefix
-- `min_length` (int): Minimum length (default: 3)
-
-**Returns:** bool
-
-**Examples:**
-
-```python
-from shared.id_generator import validate_id
-
-validate_id("a3f7b2c1")  # True
-validate_id("t12345", prefix="t")  # True
-validate_id("xyz")  # False
-validate_id("12", min_length=3)  # False
-```
+Returns `True` if the string is a valid ID.
 
 #### `extract_prefix(id_str)`
 
-Split ID into prefix and hex parts.
-
-**Returns:** tuple[str, str]
-
-**Examples:**
-
-```python
-from shared.id_generator import extract_prefix
-
-extract_prefix("t12345")  # ("t", "12345")
-extract_prefix("a3f7b2c1")  # ("", "a3f7b2c1")
-```
+Returns `(prefix, hex_part)` tuple.
 
 ---
 
-### Calendar Writer
+### Calendar Writer — `shared.calendar.ics_writer`
 
-**Module**: `shared.calendar.ics_writer`
+#### `CalendarEvent` dataclass
 
-#### `CalendarEvent`
-
-Dataclass representing a calendar event.
-
-**Attributes:**
-
-- `uid` (str): Unique identifier
-- `title` (str): Event title
-- `start_date` (datetime|date): Start date/time
-- `end_date` (datetime|date, optional): End date/time
-- `description` (str, optional): Description
-- `location` (str, optional): Location
-- `status` (str, optional): CONFIRMED, TENTATIVE, CANCELLED
-- `all_day` (bool): True for all-day events
-- `categories` (list[str]): Category tags
-- `url` (str, optional): Associated URL
-
-**Example:**
-
-```python
-from shared.calendar.ics_writer import CalendarEvent
-from datetime import date
-
-event = CalendarEvent(
-    uid="task123",
-    title="Team Meeting",
-    start_date=date(2026, 3, 15),
-    description="Weekly sync",
-    location="Conference Room A"
-)
-```
+Key fields: `uid`, `title`, `start_date`, `description`, `location`, `status`, `categories`.
 
 #### `ICSWriter`
 
-Writer for iCalendar (.ics) files.
-
-**Constructor:**
-
-```python
-ICSWriter(calendar_name="Exported Calendar", timezone_str="UTC", description=None)
-```
-
-**Methods:**
-
-##### `add_event(event: CalendarEvent)`
-
-Add an event to the calendar.
-
-##### `write(filepath: str)`
-
-Write calendar to .ics file.
-
-##### `to_string() -> str`
-
-Generate ICS content as string.
-
-**Example:**
-
 ```python
 from shared.calendar.ics_writer import CalendarEvent, ICSWriter
-from datetime import date
 
-# Create writer
 writer = ICSWriter("My Tasks")
-
-# Add events
-writer.add_event(CalendarEvent(
-    uid="task1",
-    title="Review PR",
-    start_date=date(2026, 3, 15)
-))
-
-writer.add_event(CalendarEvent(
-    uid="task2",
-    title="Deploy",
-    start_date=date(2026, 3, 20)
-))
-
-# Write to file
+writer.add_event(CalendarEvent(uid="t1", title="Review", start_date=date(2026, 3, 15)))
 writer.write("tasks.ics")
 ```
 
 ---
 
-### File Locking
-
-**Module**: `shared.locking`
+### File Locking — `shared.locking`
 
 #### `file_lock(filepath, timeout=5)`
 
-Context manager for exclusive file access.
-
-**Parameters:**
-
-- `filepath` (Path): File to lock
-- `timeout` (int): Seconds to wait (default: 5)
-- `poll_interval` (float): Retry interval (default: 0.1)
-- `stale_threshold` (int): Stale lock age in seconds (default: 300)
-
-**Raises:**
-
-- `LockTimeout`: If lock cannot be acquired
-
-**Example:**
+Context manager for exclusive file access. Raises `LockTimeout` if the lock cannot be acquired.
 
 ```python
 from shared.locking import file_lock
 from pathlib import Path
 
 with file_lock(Path("data.xml"), timeout=10):
-    # Exclusive access guaranteed
-    data = load_data()
-    modify(data)
-    save_data()
+    process_file()
 ```
 
-#### `check_lock(filepath) -> Optional[str]`
+#### `check_lock(filepath)`
 
-Check if file is currently locked.
-
-**Returns:** PID of lock holder, or None
-
-**Example:**
-
-```python
-from shared.locking import check_lock
-from pathlib import Path
-
-holder = check_lock(Path("data.xml"))
-if holder:
-    print(f"File locked by process {holder}")
-```
+Returns the PID of the lock holder, or `None`.
 
 ---
 
 ## Python API
 
-### ManifestRepository
+### `ManifestRepository`
 
-**Module**: `manifest_manager.manifest_core`
+Key methods (all return a `Result` object with `.success` and `.message`):
 
-#### Core Methods
+| Method | Description |
+|---|---|
+| `load(filepath, password, auto_sidecar, rebuild_sidecar)` | Load XML or 7z |
+| `save(filepath, password)` | Save XML or 7z |
+| `add_node(parent_xpath, spec, auto_id=True)` | Add a node |
+| `edit_node(xpath, spec, delete)` | Edit/delete by XPath |
+| `edit_node_by_id(elem_id, spec, delete)` | Edit/delete by exact ID |
+| `ensure_ids(overwrite=False)` | Auto-generate missing IDs |
+| `search(xpath)` | Return list of matching elements |
+| `wrap_content(new_root_tag)` | Wrap top-level nodes |
+| `merge_from(path, password)` | Merge another file |
 
-##### `add_node(parent_xpath, spec, auto_id=True)`
-
-Add a node to the manifest.
-
-**Parameters:**
-
-- `parent_xpath` (str): Parent XPath
-- `spec` (NodeSpec): Node specification
-- `auto_id` (bool): Auto-generate ID
-
-**Returns:** Result object
-
-**Example:**
+### `NodeSpec`
 
 ```python
-from manifest_manager import ManifestRepository, NodeSpec
+from manifest_manager.manifest_core import NodeSpec
 
-repo = ManifestRepository("project.xml")
-spec = NodeSpec(
-    tag="task",
-    topic="Review PR",
-    attributes={"status": "active"}
-)
+spec = NodeSpec(tag="task", topic="Review PR", status="active",
+                resp="alice", due="2026-03-15", attrs={"priority": "high"})
 
-result = repo.add_node("/*", spec, auto_id=True)
-if result.success:
-    print(f"Added: {result.data['id']}")
+# Or from argparse namespace:
+spec = NodeSpec.from_args(args, attributes=extra_attrs)
 ```
 
-##### `find_nodes(xpath, view=ManifestView.TREE)`
-
-Find nodes by XPath.
-
-**Parameters:**
-
-- `xpath` (str): XPath query
-- `view` (ManifestView): Output format
-
-**Returns:** List of nodes
-
-##### `edit_node(selector, updates)`
-
-Edit a node.
-
-**Parameters:**
-
-- `selector` (str): XPath or ID
-- `updates` (dict): Attributes to update
-
-**Returns:** Result object
-
-##### `delete_node(selector)`
-
-Delete a node.
-
-**Returns:** Result object
-
----
-
-### NodeSpec
-
-**Module**: `manifest_manager.manifest_core`
-
-Factory for creating node specifications.
-
-#### `NodeSpec.from_args(args, attributes=None)`
-
-Create spec from argparse namespace.
-
-**Example:**
+### `dataframe_conversion` module
 
 ```python
-from manifest_manager import NodeSpec
-
-# From parsed args
-spec = NodeSpec.from_args(args, attributes={"custom": "value"})
-
-# Manual creation
-spec = NodeSpec(
-    tag="task",
-    topic="My Task",
-    status="active",
-    resp="alice",
-    attributes={"priority": "high"}
+from manifest_manager.dataframe_conversion import (
+    to_dataframe,        # element → DataFrame
+    find_to_dataframe,   # XPath search → DataFrame
+    from_dataframe,      # DataFrame → element (round-trip)
+    preview_dataframe,   # formatted summary string
 )
 ```
+
+`to_dataframe(root, *, include_text=True, generate_ids=False)`  
+`find_to_dataframe(tree, xpath, *, wrap_tag="results", include_text=True)`  
+`from_dataframe(df, root_tag="root")` — raises `ValueError` if `id`, `parent_id`, or `tag` columns are missing  
+`preview_dataframe(df, max_rows=10)`
 
 ---
 
 ## Configuration
 
-### pyproject.toml
+### `pyproject.toml`
 
 ```toml
 [project]
 name = "manifest-manager"
 version = "3.5.0"
 requires-python = ">=3.8"
-dependencies = [
-    "lxml>=4.9.0",
-    "py7zr>=0.20.0",
-    "pyyaml>=6.0",
-]
+dependencies = ["lxml>=4.9.0", "py7zr>=0.20.0", "pyyaml>=6.0"]
+
+[project.scripts]
+manifest = "manifest_manager.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
 pythonpath = ["src"]
 ```
 
-### shortcuts.yaml
+### `config/shortcuts.yaml`
 
 ```yaml
 shortcuts:
   - task
   - project
   - item
-  # ... add more
+  - note
+  - milestone
+  - idea
+  - location
+  - contact
+  - reference
+  - resource
 
 reserved_keywords:
   - help
   - exit
-  # ... add more (but NOT "add"!)
+  - quit
+  - save
+  - list
+  - search
+  - find
+  - delete
+  - remove
+  - edit
+  - show
+  - export
+  - import
 ```
 
 ---
 
-## Advanced Usage
-
-### Batch Operations
-
-```bash
-# Add multiple tasks
-for title in "Task 1" "Task 2" "Task 3"; do
-    manifest add task "$title" --status active
-done
-```
-
-### Scripting
-
-```python
-from manifest_manager import ManifestRepository, NodeSpec
-
-# Programmatic usage
-repo = ManifestRepository("project.xml")
-
-tasks = [
-    ("Review PR", "active"),
-    ("Deploy", "planning"),
-    ("Test", "active")
-]
-
-for title, status in tasks:
-    spec = NodeSpec(tag="task", topic=title, status=status)
-    repo.add_node("/*", spec, auto_id=True)
-
-repo.save()
-```
-
-### Custom Shortcuts
-
-```yaml
-# Domain-specific shortcuts
-shortcuts:
-  - bug          # add bug "Fix crash"
-  - feature      # add feature "Dark mode"
-  - meeting      # add meeting "Team sync"
-  - document     # add document "Requirements"
-```
-
-### Parent Resolution
-
-```bash
-# By ID
-add task "Subtask" --parent a3f7
-
-# By XPath
-add task "Feature" --parent "//project[@title='Website']"
-
-# Nested
-add task "Detail" --parent "//project//milestone[@title='v1.0']"
-```
-
----
-
-## Error Handling
-
-### Common Errors
-
-**ModuleNotFoundError**:
-
-```bash
-# Solution
-pip install -e .
-```
-
-**LockTimeout**:
-
-```python
-# Another process is using the file
-# Wait or use longer timeout
-with file_lock(path, timeout=30):
-    ...
-```
-
-**XPath Syntax Error**:
-
-```bash
-# Invalid
-find //task[@status=active]  # Missing quotes
-
-# Valid
-find "//task[@status='active']"
-```
-
-**Shortcut Not Found**:
-
-```bash
-# Check config
-cat config/shortcuts.yaml
-
-# Reload shell
-exit
-manifest
-```
-
----
-
-## See Also
-
-- [README.md](README.md) - Project overview
-- [CHEATSHEET.md](CHEATSHEET.md) - Quick reference
-- [TEST_PHASE3_GUIDE.md](TEST_PHASE3_GUIDE.md) - Testing guide
-
----
-
-*Last updated: February 2026*
+*Last updated: March 2026*
