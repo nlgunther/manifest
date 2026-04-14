@@ -1,75 +1,19 @@
-# Productivity Suite CLI Harmonization
+# Grove
 
-**Version**: 3.5.0  
-**Status**: Phase 3 Complete  
-**Last Updated**: March 2026
+**Version**: 2.0.0  
+**Last Updated**: April 2026
 
 ---
 
 ## Overview
 
-This project harmonizes the command-line interfaces of **Manifest Manager** and **Smart Scheduler**, two complementary productivity tools. The goal is to provide a unified, intuitive user experience while maintaining the unique strengths of each tool.
+Grove is a unified command-line productivity suite combining two complementary tools in a single installable package:
 
-### The Tools
+**Manifest Manager v3.5** — hierarchical XML knowledge base for organizing anything with a tree structure: tasks, projects, locations, contacts, notes, and custom schemas. Queried via XPath; edited via an interactive shell.
 
-**Manifest Manager v3.4+**
-- Hierarchical XML data management
-- Task and project organization
-- Flexible schema with arbitrary tags
-- XPath querying and ID-based lookups
+**Smart Scheduler v2.0** — flat, project-oriented task manager with natural language date parsing, status workflows, and JSON storage. Optimized for daily task tracking with fast ID-based editing.
 
-**Smart Scheduler v2.0** (planned integration)
-- Time-based task management
-- Natural language date parsing
-- Status workflows
-- Calendar integration (ICS export)
-
----
-
-## What's New in v3.5
-
-### 🚀 Phase 3: Shortcut System
-
-**The Problem**: Typing `add --tag task --topic "Buy milk"` is verbose for common operations.
-
-**The Solution**: Shortcuts that expand automatically!
-
-```bash
-# New shortcut syntax (70% less typing!)
-add task "Buy milk"
-add project "Q1 Goals" --status planning
-add location "Conference Room A"
-
-# Expands to:
-add --tag task --topic "Buy milk"
-add --tag project --topic "Q1 Goals" --status planning
-add --tag location --topic "Conference Room A"
-```
-
-**Features:**
-- ✅ Configurable shortcuts (YAML file)
-- ✅ Works with all existing flags
-- ✅ Backward compatible (old syntax still works)
-- ✅ Extensible (add your own shortcuts)
-
-### 🔧 Phase 2: Vocabulary Harmonization
-
-**Consistent flag names** used across commands:
-
-| Attribute | Flag | Notes |
-|---|---|---|
-| Topic / title | `--topic` | Use for node title in `add` and `edit` |
-| Responsible party | `--resp` | Use for assignee in `add` and `edit` |
-| Due date | `--due` | Format: `YYYY-MM-DD` |
-| Status | `--status` | Common values: `active`, `done`, `pending`, `blocked`, `cancelled` |
-
-### 📦 Phase 1: Shared Infrastructure
-
-**Common libraries** for both tools:
-
-- `shared.id_generator` - Standardized ID creation
-- `shared.calendar.ics_writer` - Unified ICS export
-- `shared.locking` - File locking for safe concurrent access
+Both tools share a common infrastructure library (`shared`) for ID generation, file locking, calendar export, date parsing, and cross-tool integration.
 
 ---
 
@@ -78,93 +22,105 @@ add --tag location --topic "Conference Room A"
 ### Prerequisites
 
 - Python 3.8+
-- Required packages: `lxml`, `py7zr`, `pyyaml`
+- Dependencies: `lxml`, `py7zr`, `pyyaml`
 
 ### Setup
 
 ```bash
-# Clone the repository
 git clone <repository-url>
-cd manifest
+cd grove
 
-# Install in development mode
 pip install -e .
 
-# Verify installation
-manifest --version
+# Verify both CLIs are available
+manifest --help
+scheduler --help
 ```
 
 ### Configuration
 
-The shortcut system uses a configuration file:
-
-**Location**: `config/shortcuts.yaml`
-
-**Default shortcuts**: task, project, item, note, milestone, idea, location, contact, reference
-
-**To add custom shortcuts**, edit the config file:
-
+**Manifest shortcuts** — `config/shortcuts.yaml`:
 ```yaml
 shortcuts:
   - task
   - project
+  - note
+  - milestone
   - location
-  - bug        # Add your own!
-  - feature
-  - meeting
+  - contact
+  - reference
+
+reserved_keywords:
+  - help
+  - exit
+  - save
+  - list
+  - find
+  - edit
+  - delete
 ```
+
+**Scheduler data directory** — set on first run or via `config location`:
+```
+scheduler
+> config location "G:\My Drive\schedulers"
+```
+
+**Cross-tool integration** — `config/integration.yaml`:
+```yaml
+paths:
+  scheduler_data_dir: "G:/My Drive/schedulers"
+  # manifest_default_dir: "G:/My Drive/manifests"
+
+status_mapping:
+  to_scheduler:
+    # active:  in_progress
+    # pending: todo
+    # blocked: waiting
+```
+All mappings are opt-in — nothing is converted silently until you uncomment them.
 
 ---
 
 ## Quick Start
 
-### Basic Usage
+### Manifest Manager
 
 ```bash
-# Start the interactive shell
 manifest
 
-# Load a manifest file
-(manifest) load myproject.xml
-
-# Add items using shortcuts
+(manifest) load myproject.xml --autosc
 (myproject.xml) add task "Review PR #42"
-(myproject.xml) add project "Website Redesign" --status planning
-(myproject.xml) add location "Building A, Room 203"
-
-# Search and edit
-(myproject.xml) find task
+(myproject.xml) add task "Deploy" --due tomorrow --status active
+(myproject.xml) find a3f
 (myproject.xml) edit a3f7 --status done
-
-# Save your changes
 (myproject.xml) save
 ```
 
-### Shortcut Syntax
-
-**Basic pattern**: `add <shortcut> "Title" [--flags]`
+### Smart Scheduler
 
 ```bash
-# Simple
-add task "Buy groceries"
+scheduler
 
-# With flags
-add task "Important task" --status active --resp alice
-
-# With parent location
-add task "Subtask" --parent a3f7
-
-# Multiple attributes
-add project "Q1 Goals" --status planning --resp bob --due 2026-03-31
+> new project work "Work Tasks"
+> add task work "Deploy website" --due tomorrow --tags urgent,deploy
+> list --all
+> edit t30b0a --status in_progress
+> export-json --all --output backup.json
+> cleanup --done --execute
 ```
 
-### Full Syntax (Still Works!)
+### Cross-tool: Manifest → Scheduler
 
 ```bash
-# Old way (backward compatible)
-add --tag task --topic "Buy groceries"
-add --tag project --topic "Q1 Goals" --status planning
+# Export manifest tasks to the scheduler (from inside the manifest shell)
+(myproject.xml) export-scheduler "//task[@due][@status='active']" --project q1-work
+
+# Or pull from inside the scheduler shell
+> import-manifest myproject.xml --project q1-work
 ```
+
+Status mapping is controlled by `config/integration.yaml`. Without explicit mappings configured, all imported tasks arrive as `todo` — no silent coercion.
 
 ---
 
@@ -173,386 +129,195 @@ add --tag project --topic "Q1 Goals" --status planning
 ### Directory Structure
 
 ```
-manifest/
+grove/
 ├── config/
-│   └── shortcuts.yaml          # Shortcut configuration
+│   ├── shortcuts.yaml              # Manifest shortcut configuration
+│   └── integration.yaml            # Cross-tool integration settings
 ├── src/
-│   ├── shared/                 # Shared infrastructure
+│   ├── shared/                     # Shared infrastructure
 │   │   ├── __init__.py
-│   │   ├── id_generator.py     # ID generation
-│   │   ├── locking.py          # File locking
+│   │   ├── id_generator.py         # Unified ID generation
+│   │   ├── locking.py              # File locking
+│   │   ├── dates.py                # Natural language date parsing
+│   │   ├── status_map.py           # Bidirectional status conversion
+│   │   ├── integration_config.py   # config/integration.yaml loader
+│   │   ├── manifest_bridge.py      # Node → Task conversion + push
 │   │   └── calendar/
 │   │       ├── __init__.py
-│   │       └── ics_writer.py   # ICS export
-│   └── manifest_manager/       # Manifest Manager package
+│   │       └── ics_writer.py       # ICS calendar export
+│   ├── manifest_manager/           # Manifest Manager package
+│   │   ├── __init__.py
+│   │   ├── manifest.py             # CLI shell
+│   │   ├── manifest_core.py        # Core repository logic
+│   │   ├── storage.py              # XML / 7z storage
+│   │   ├── calendar.py             # Calendar export helpers
+│   │   ├── config.py               # Per-file config
+│   │   ├── id_sidecar.py           # ID index
+│   │   ├── dataframe_conversion.py # XML ↔ DataFrame
+│   │   └── dataframe_commands.py   # to_df / find_df / from_df
+│   └── smart_scheduler/            # Smart Scheduler package
 │       ├── __init__.py
-│       ├── manifest.py                 # CLI shell
-│       ├── manifest_core.py            # Core logic
-│       ├── storage.py                  # Storage layer
-│       ├── calendar.py                 # Calendar export helpers
-│       ├── config.py                   # Per-file config
-│       ├── id_sidecar.py               # ID sidecar index
-│       ├── dataframe_conversion.py     # XML ↔ DataFrame (v3.5)
-│       └── dataframe_commands.py       # to_df / find_df / from_df (v3.5)
+│       ├── __main__.py
+│       ├── cli.py                  # Interactive CLI
+│       ├── config.py               # Data dir / preferences
+│       ├── models.py               # Task, Project, Contact, TaskStatus
+│       ├── services/
+│       │   ├── task_service.py     # CRUD + global ID lookup
+│       │   ├── calendar_service.py # ICS export (via shared.ICSWriter)
+│       │   └── maintenance_service.py # Backup / restore
+│       └── storage/
+│           ├── base.py             # StorageStrategy ABC
+│           ├── factory.py          # Engine selection
+│           ├── json_store.py       # JSON storage (default)
+│           └── sqlite_store.py     # SQLite storage
 ├── tests/
-│   ├── shared/                 # Tests for shared code
-│   │   ├── test_id_generator.py
-│   │   ├── test_ics_writer.py
-│   │   └── test_locking.py
-│   │   ├── test_phase3_shortcuts.py
-│   ├── test_dataframe_conversion.py
-│   ├── test_export_calendar_ids.py
-│   └── ... (see tests/ directory)
-├── docs/
-│   ├── API.md                  # API documentation
-│   ├── CHEATSHEET.md           # Quick reference
-│   └── PHASE_1_REFLECTION.md   # Implementation notes
-├── pyproject.toml              # Project configuration
-└── README.md                   # This file
+│   ├── shared/                     # Shared library tests
+│   ├── smart_scheduler/            # Scheduler tests
+│   ├── integration/                # Cross-package tests
+│   └── test_*.py                   # Manifest tests
+├── pyproject.toml
+└── README.md
 ```
 
-### Package Layout
+### `pyproject.toml`
 
-```python
-# The "src layout" pattern
-src/
-├── shared/              # Shared between tools
-│   └── ...
-└── manifest_manager/    # Manifest Manager
-    └── ...
+```toml
+[project]
+name = "grove"
+version = "2.0.0"
+dependencies = ["lxml>=4.9.0", "py7zr>=0.20.0", "pyyaml>=6.0"]
 
-# Install makes both importable:
-from shared import generate_id
-from manifest_manager import ManifestRepository
+[project.scripts]
+manifest  = "manifest_manager.__main__:main"
+scheduler = "smart_scheduler.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 ```
 
 ---
 
-## Features
+## Shared Infrastructure
 
-### Shortcut System (v3.5)
+### Date Parsing
 
-**Automatic expansion** of common commands:
-
-```bash
-add task "Title"
-# ↓ Expands to:
-add --tag task --topic "Title"
-```
-
-**Configurable** via YAML:
-- Add domain-specific shortcuts
-- Reserved keyword protection
-- Easy team customization
-
-### Smart ID Matching (v3.4)
-
-**Prefix matching** for IDs:
-
-```bash
-# Full ID: a3f7b2c1
-edit a3f                    # Matches prefix
-edit a3f7b2c1               # Exact match
-
-# Multiple matches? Interactive selection:
-edit a3
-  [1] a3f7b2c1 - Task: Review PR
-  [2] a3a9c4d2 - Task: Update docs
-  Select: 1
-```
-
-### Flexible Selectors
-
-**XPath or ID** - use what's natural:
-
-```bash
-# XPath (precise)
-find "//task[@status='active']"
-
-# ID (fast)
-find a3f7
-
-# ID prefix (convenient)
-find a3f
-```
-
-### File Locking (Phase 5)
-
-**Prevents corruption** from concurrent access:
+Both tools accept natural language dates via `shared.dates.parse_date`. The `--due` flag in both shells resolves through this function.
 
 ```python
-from shared.locking import file_lock
+from shared.dates import parse_date
 
-with file_lock(Path("data.xml"), timeout=5):
-    # Exclusive access guaranteed
-    modify_data()
+parse_date("tomorrow")   # "2026-04-15"
+parse_date("+3")         # "2026-04-17"
+parse_date("monday")     # next Monday as ISO date
+parse_date("2026-06-15") # "2026-06-15" (passthrough)
 ```
+
+### Status Mapping
+
+Conversion between the tools' different status vocabularies is configured in `config/integration.yaml` and applied via `shared.status_map`. Returns `None` until the user explicitly enables mappings, so callers can default gracefully.
+
+```python
+from shared.status_map import to_scheduler_status, to_manifest_status
+
+to_scheduler_status("active")      # "in_progress" if configured, else None
+to_manifest_status("in_progress")  # "active" if configured, else None
+```
+
+### ID Generation
+
+```python
+from shared import generate_id, validate_id
+
+generate_id()                      # "a3f7b2c1"  (manifest: 8-char, no prefix)
+generate_id(prefix="t", length=5)  # "ta3f7b"    (scheduler task IDs)
+generate_id(prefix="c", length=5)  # "ca3f7b"    (scheduler contact IDs)
+```
+
+### File Locking
+
+```python
+from shared import file_lock, LockTimeout
+
+with file_lock(Path("data.json"), timeout=5):
+    save_data()
+```
+
+### ICS Calendar Export
+
+```python
+from shared.calendar.ics_writer import CalendarEvent, ICSWriter
+
+writer = ICSWriter("My Tasks")
+writer.add_event(CalendarEvent(
+    uid="t1a2b3", title="Annual review",
+    start_date=date(2026, 9, 1), all_day=True,
+))
+writer.write("tasks.ics")
+```
+
+---
+
+## Key Differences Between the Tools
+
+| | Manifest Manager | Smart Scheduler |
+|---|---|---|
+| **Data format** | XML (hierarchical) | JSON (flat projects) |
+| **Storage location** | Any path, per-file | Configured data dir |
+| **Schema** | Flexible / arbitrary tags | Fixed: Project → Task, Contact |
+| **Query style** | XPath or ID prefix | ID prefix or project slug |
+| **ID format** | 8-char hex (`a3f7b2c1`) | Prefixed 6-char (`ta3f7b`) |
+| **Dates** | `due` attribute, natural language | `due_date` field, natural language |
+| **Calendar export** | `export-calendar` | `export <id> ics` |
+| **Best for** | Knowledge base, complex hierarchies | Daily task tracking, status workflows |
 
 ---
 
 ## Testing
 
-### Run All Tests
-
 ```bash
-# All tests
-pytest
-
-# Specific module
+pytest                              # all 331 tests
 pytest tests/shared/ -v
-pytest tests/test_phase3_shortcuts.py -v
+pytest tests/smart_scheduler/ -v   # parameterized: json + sqlite
+pytest tests/integration/ -v
 
-# With coverage
-pytest --cov=manifest_manager --cov=shared --cov-report=html
+pytest --cov=manifest_manager --cov=smart_scheduler --cov=shared
 ```
 
-### Test Coverage
+### Test Count (April 2026)
 
-**Phase 1 (Shared Infrastructure):**
-- ✅ ID generation (8 tests)
-- ✅ ICS export (6 tests)
-- ✅ File locking (5 tests)
-
-**Phase 3 (Shortcuts):**
-- ✅ Basic expansion (3 tests)
-- ✅ Shortcuts with flags (3 tests)
-- ✅ Backward compatibility (2 tests)
-- ✅ Edge cases (5 tests)
-- ✅ Config loading (3 tests)
-- ✅ Integration scenarios (4 tests)
-
-**Total**: 39+ tests passing
-
----
-
-## Configuration
-
-### shortcuts.yaml
-
-```yaml
-# Shortcut configuration
-shortcuts:
-  - task          # add task "Title"
-  - project       # add project "Name"
-  - item          # add item "Thing"
-  - note          # add note "Reminder"
-  - milestone     # add milestone "v1.0"
-  - idea          # add idea "Feature"
-  - location      # add location "Place"
-  - contact       # add contact "Person"
-  - reference     # add reference "Doc"
-
-# Reserved keywords (cannot be shortcuts)
-reserved_keywords:
-  - help
-  - exit
-  - save
-  - list
-  - edit
-  - find
-  - delete
-```
-
-### pyproject.toml
-
-```toml
-[project]
-name = "manifest-manager"
-version = "3.5.0"
-dependencies = [
-    "lxml>=4.9.0",
-    "py7zr>=0.20.0",
-    "pyyaml>=6.0",
-]
-
-[tool.setuptools.packages.find]
-where = ["src"]  # Auto-discovers packages
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
-```
-
----
-
-## Roadmap
-
-### ✅ Completed
-
-- [x] **Phase 1**: Shared infrastructure library
-- [x] **Phase 2**: Vocabulary harmonization
-- [x] **Phase 3**: Shortcut system
-
-### 🔜 Upcoming
-
-- [ ] **Phase 4**: Integrate shared components into both tools
-  - Replace ID generation with `shared.id_generator`
-  - Replace ICS export with `shared.calendar.ics_writer`
-  - Comprehensive compatibility testing
-
-- [ ] **Phase 5**: File locking integration
-  - Add locking to save operations
-  - Add locking to database writes
-  - Test concurrent access scenarios
-
-### 📅 Future
-
-- [ ] **Phase 6**: Smart Scheduler integration
-  - Apply shortcut system to Scheduler
-  - Unified CLI patterns
-  - Cross-tool compatibility
-
----
-
-## Contributing
-
-### Adding New Shortcuts
-
-1. Edit `config/shortcuts.yaml`:
-   ```yaml
-   shortcuts:
-     - your_shortcut  # Add here
-   ```
-
-2. Test it:
-   ```bash
-   manifest
-   (manifest) load test
-   (test.xml) add your_shortcut "Test"
-   ```
-
-3. Verify expansion:
-   ```bash
-   # Should create node with tag="your_shortcut"
-   (test.xml) list
-   ```
-
-### Reporting Issues
-
-**Bug reports** should include:
-- Command that failed
-- Expected behavior
-- Actual behavior
-- Manifest Manager version
-- Python version
-
-### Development Setup
-
-```bash
-# Install dev dependencies
-pip install -e ".[dev]"
-
-# Run tests before committing
-pytest
-
-# Check code style
-flake8 src/
-
-# Run type checker (if using)
-mypy src/
-```
+| Suite | Tests |
+|---|---|
+| Manifest Manager | 172 |
+| Smart Scheduler | 57 |
+| Shared library | 12 |
+| Integration | 59 |
+| **Total** | **331** |
 
 ---
 
 ## Troubleshooting
 
-### Import Errors
+**`ModuleNotFoundError: No module named 'smart_scheduler'`**  
+Run `pip install -e .` from the repo root.
 
-**Problem**: `ModuleNotFoundError: No module named 'shared'`
+**`ModuleNotFoundError: No module named 'shared'`**  
+Same fix. `shared` is under `src/` and requires the editable install.
 
-**Solution**:
-```bash
-# Ensure package is installed
-pip install -e .
+**`export-scheduler` says scheduler data directory not configured**  
+Set `paths.scheduler_data_dir` in `config/integration.yaml`, or set `SCHEDULER_DATA_DIR` environment variable.
 
-# Check pythonpath in pyproject.toml
-pythonpath = ["src"]
-```
+**Manifest sidecar out of sync after manual XML edit**  
+Run `rebuild` inside the manifest shell.
 
-### Shortcut Not Working
+**Scheduler data not found after moving to Google Drive**  
+Use `config location <new_path>` inside the scheduler shell, or update `config/integration.yaml`.
 
-**Problem**: `add task "Title"` not expanding
+**Tests fail with import errors**  
+Ensure `pythonpath = ["src"]` is in `pyproject.toml` under `[tool.pytest.ini_options]`, and that test directories do **not** contain `__init__.py` files.
 
-**Solution**:
-1. Check `config/shortcuts.yaml` exists
-2. Verify "task" is in shortcuts list
-3. Ensure "task" not in reserved keywords
-4. Reload the shell
-
-### Tests Failing
-
-**Problem**: Import errors in tests
-
-**Solution**:
-```bash
-# Ensure conftest.py exists in project root
-# It should contain:
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
-```
+**Integration config changes not taking effect**  
+The config is cached per-process. Restart the shell after editing `integration.yaml`.
 
 ---
 
-## FAQ
-
-### Q: Can I use both shortcut and full syntax?
-
-**A**: Yes! They work identically:
-```bash
-add task "Title"              # Shortcut
-add --tag task --topic "Title"  # Full syntax
-```
-
-### Q: How do I add a custom shortcut?
-
-**A**: Edit `config/shortcuts.yaml` and add your shortcut to the list.
-
-### Q: Will shortcuts break existing scripts?
-
-**A**: No. Scripts using full syntax continue to work unchanged.
-
-### Q: Can I disable shortcuts?
-
-**A**: Yes. Use the full `--tag` syntax, which bypasses shortcut expansion.
-
-### Q: What if my shortcut conflicts with a flag?
-
-**A**: Shortcuts must not start with `--`. The parser detects flags first.
-
-### Q: How do I see all available shortcuts?
-
-**A**: Check `config/shortcuts.yaml` or run:
-```bash
-cat config/shortcuts.yaml
-```
-
----
-
-## License
-
-[Your License Here]
-
----
-
-## Credits
-
-**Design & Implementation**: CLI Harmonization Project (2026)  
-**Tools**: Manifest Manager v3.4+, Smart Scheduler v2.0  
-**Technology**: Python 3.8+, lxml, pytest
-
----
-
-## Support
-
-**Documentation**: See `docs/` directory
-- `API.md` - Complete API reference
-- `CHEATSHEET.md` - Quick command reference
-- `PHASE_1_REFLECTION.md` - Implementation notes
-
-**Issues**: [GitHub Issues]  
-**Discussions**: [GitHub Discussions]
-
----
-
-*Last updated: February 2026*
+*Last updated: April 2026*

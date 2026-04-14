@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "manifest-manager"
-version = "3.4.0"
-description = "Hierarchical XML data management CLI"
+name = "grove"
+version = "2.0.0"
+description = "A Productivity Suite containing a Manifest Manager and a Smart Scheduler"
 requires-python = ">=3.8"
 dependencies = [
     "lxml>=4.9.0",
@@ -14,11 +14,11 @@ dependencies = [
 ]
 
 [project.scripts]
-manifest = "manifest_manager.__main__:main"
+manifest  = "manifest_manager.__main__:main"
+scheduler = "smart_scheduler.__main__:main"
 
-# --- IMPROVED SECTION ---
 [tool.setuptools.packages.find]
-where = ["src"]  # Automatically finds ALL packages inside src
+where = ["src"]  # Auto-discovers manifest_manager, smart_scheduler, shared
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

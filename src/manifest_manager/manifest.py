@@ -711,6 +711,11 @@ class ManifestShell(cmd.Cmd):
                     attrs['id'] = args.node_id  # Custom ID
                     auto_id = False  # Don't auto-generate if custom provided
             
+            # Resolve natural language --due (e.g. "tomorrow", "+3", "monday")
+            if args.due:
+                from shared.dates import parse_date as _parse_date
+                args.due = _parse_date(args.due) or args.due
+
             # Use factory method (v3.4)
             spec = NodeSpec.from_args(args, attributes=attrs)
             result = self.repo.add_node(parent_xpath, spec, auto_id=auto_id)
@@ -1486,6 +1491,97 @@ class ManifestShell(cmd.Cmd):
                 print(f"✓ Restored from {args.filename}")
                 if original_filepath:
                     print(f"Tip: Use 'save {original_filepath}' to write back to original file.")
+
+        self._exec(_run)
+
+    def do_export_scheduler(self, arg):
+        """Export manifest nodes to Smart Scheduler as tasks.
+
+        Usage:
+            export-scheduler [xpath] --project <slug> [--name <n>] [--engine json|sqlite]
+
+        Arguments:
+            xpath        XPath or ID selector for nodes to export.
+                         Defaults to config/integration.yaml export_scheduler.default_xpath,
+                         or "//task[@due]" if that is also empty.
+
+        Options:
+            --project    Scheduler project slug (required).
+                         Created automatically if it does not exist.
+            --name       Display name for the project (used only when creating).
+                         Defaults to the slug if omitted.
+            --engine     Storage engine: json (default) or sqlite.
+
+        Status conversion is driven by config/integration.yaml.
+        Until you configure status_mapping.to_scheduler, all exported
+        tasks will have status 'todo'.
+
+        Examples:
+            export-scheduler --project q1-work
+            export-scheduler "//task[@due][@status='active']" --project q1-work
+            export-scheduler a3f7 --project q1-work
+        """
+        p = SafeParser(prog="export-scheduler",
+                       description="Export manifest nodes to Smart Scheduler")
+        p.add_argument("selector", nargs="?", default="",
+                       help="XPath or ID prefix (default: from integration.yaml)")
+        p.add_argument("--project", required=True,
+                       help="Scheduler project slug")
+        p.add_argument("--name", default="",
+                       help="Project display name (only used when creating)")
+        p.add_argument("--engine", default="json", choices=["json", "sqlite"],
+                       help="Storage engine (default: json)")
+
+        def _run():
+            args = p.parse_args(shlex.split(arg))
+
+            if not self.repo.tree:
+                print("Error: No manifest loaded. Use 'load <file>' first.")
+                return
+
+            from shared.integration_config import (
+                load_integration_config, get_scheduler_data_dir,
+            )
+            cfg = load_integration_config()
+            export_cfg = cfg.get("export_scheduler", {})
+
+            selector = args.selector.strip()
+            if not selector:
+                selector = export_cfg.get("default_xpath", "") or "//task[@due]"
+
+            xpath, error = self._resolve_selector_to_xpath(selector)
+            if error:
+                print(f"Error: {error}")
+                return
+
+            nodes = self.repo.search(xpath)
+            if not nodes:
+                print(f"No nodes matched: {selector}")
+                return
+            print(f"Found {len(nodes)} node(s) matching '{selector}'.")
+
+            data_dir = get_scheduler_data_dir()
+            if data_dir is None:
+                print(
+                    "Error: Scheduler data directory not configured.\n"
+                    "Set paths.scheduler_data_dir in config/integration.yaml\n"
+                    "or set the SCHEDULER_DATA_DIR environment variable."
+                )
+                return
+
+            from shared.manifest_bridge import build_tasks, push_tasks_to_scheduler
+
+            tasks, skip_reasons = build_tasks(nodes)
+            result = push_tasks_to_scheduler(
+                tasks=tasks,
+                project_slug=args.project,
+                project_name=args.name or args.project,
+                data_dir=data_dir,
+                storage_engine=args.engine,
+            )
+            result.skipped = len(skip_reasons)
+            result.skipped_reasons = skip_reasons
+            print(result)
 
         self._exec(_run)
 

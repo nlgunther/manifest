@@ -1,0 +1,131 @@
+  # =============================================================================
+# config/integration.yaml
+# Task Manager 2.0 — Cross-tool Integration Configuration
+# =============================================================================
+#
+# This file controls all behaviour that bridges Manifest Manager and
+# Smart Scheduler.  The defaults are deliberately conservative:
+#
+#   - No status mappings are active until you uncomment them.
+#   - No paths are assumed until you set them.
+#
+# This means export-scheduler and import-manifest will skip status
+# conversion (leaving tasks as 'todo') until you explicitly configure
+# the mappings below.  This is intentional — silent coercion loses
+# information; explicit mapping is auditable and reversible.
+#
+# After editing this file, changes take effect immediately on the next
+# command — no restart needed.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# PATHS
+# Absolute paths to data directories used by each tool.
+# These let export-scheduler find the scheduler without being told each time,
+# and import-manifest find the default manifest directory.
+#
+# You can also set these via environment variables:
+#   SCHEDULER_DATA_DIR   overrides paths.scheduler_data_dir
+#   MANIFEST_DIR         overrides paths.manifest_default_dir
+# -----------------------------------------------------------------------------
+
+paths:
+  scheduler_data_dir: "G:/My Drive/schedulers"
+  # manifest_default_dir: "G:/My Drive/manifests"
+
+
+# -----------------------------------------------------------------------------
+# STATUS MAPPING
+#
+# Controls how status values are translated when moving tasks between tools.
+#
+# Manifest statuses : active, pending, blocked, done, cancelled
+# Scheduler statuses: todo, in_progress, waiting, done, cancelled
+#
+# HOW IT WORKS
+# ------------
+# Each section (to_scheduler / to_manifest) is a simple key: value map.
+# If a manifest status has no entry in to_scheduler, the converted task
+# gets no status set (the scheduler defaults it to 'todo').
+# Likewise for to_manifest — unmapped scheduler statuses produce no
+# status attribute on the manifest node.
+#
+# SUGGESTED MAPPINGS (uncomment to activate)
+# -------------------------------------------
+# These represent the most natural semantic equivalences, but they are
+# commented out because "natural" is subjective.  For example:
+#
+#   active → in_progress  makes sense if "active" means "I'm working on it"
+#   active → todo         makes sense if "active" just means "not done"
+#
+# Review each mapping before enabling it.
+# -----------------------------------------------------------------------------
+
+status_mapping:
+
+  # Manifest → Scheduler (used by export-scheduler, import-manifest)
+  to_scheduler:
+    # active:    in_progress   # "active" means currently being worked on
+    # active:    todo          # "active" just means open/not done
+    # pending:   todo
+    # blocked:   waiting
+    # done:      done
+    # cancelled: cancelled
+
+  # Scheduler → Manifest (reserved for future sync / reverse-import features)
+  to_manifest:
+    # in_progress: active
+    # todo:        pending
+    # waiting:     blocked
+    # done:        done
+    # cancelled:   cancelled
+
+
+# -----------------------------------------------------------------------------
+# EXPORT-SCHEDULER DEFAULTS
+# Default behaviour for the manifest `export-scheduler` command.
+# All of these can be overridden per-invocation with CLI flags.
+# -----------------------------------------------------------------------------
+
+export_scheduler:
+  # Default project slug to use when no --project flag is given.
+  # If left blank, export-scheduler will prompt for a project name.
+  # default_project: ""
+
+  # XPath filter applied automatically to every export-scheduler run.
+  # Only nodes matching this expression will be exported.
+  # Override per-invocation with an explicit XPath argument.
+  # Useful if you only ever want to export tasks with a due date.
+  #
+  # default_xpath: "//task[@due]"
+  # default_xpath: "//task[@due][@status='active']"
+  default_xpath: ""
+
+  # What to do when a node with no due date is encountered.
+  #   skip   — silently ignore it (default)
+  #   warn   — print a warning and skip
+  #   export — export it without a due_date field
+  on_missing_due: "skip"
+
+  # Store the originating manifest node ID in the scheduler task's
+  # notes field as a back-reference, e.g. "manifest:a3f7b2c1".
+  # Useful for tracing a scheduler task back to its manifest source.
+  store_manifest_id: true
+
+
+# -----------------------------------------------------------------------------
+# IMPORT-MANIFEST DEFAULTS
+# Default behaviour for the scheduler `import-manifest` command.
+# -----------------------------------------------------------------------------
+
+import_manifest:
+  # Default XPath applied when no explicit XPath is given.
+  # default_xpath: "//task[@due]"
+  default_xpath: ""
+
+  # Same on_missing_due behaviour as export_scheduler above.
+  on_missing_due: "skip"
+
+  # Same back-reference behaviour as export_scheduler above.
+  store_manifest_id: true
