@@ -39,6 +39,19 @@ scheduler --help
 
 ### Configuration
 
+**Path aliases** — `%APPDATA%\manifest\config.yaml` (Windows) / `~/.config/manifest/config.yaml` (macOS/Linux):
+```yaml
+aliases:
+  basic: "g:/my drive/manifests/todo2026"
+  work:  "g:/my drive/manifests/work2026"
+
+startup:
+  default_file: "g:/my drive/manifests/todo2026"
+  autosc: true
+```
+
+With aliases defined, `load basic --autosc` expands to the full path. With `startup.default_file` set, the file opens automatically on every `manifest` launch. Create the file manually if it doesn't exist — it is never created automatically.
+
 **Manifest shortcuts** — `config/shortcuts.yaml`:
 ```yaml
 shortcuts:
@@ -317,6 +330,9 @@ pytest --cov=manifest_manager --cov=smart_scheduler --cov=shared
 ---
 
 ## Troubleshooting
+
+**`load basic` creates `basic.xml` instead of loading the real file**  
+The global config file doesn't exist or doesn't have an `aliases` key. Create `%APPDATA%\manifest\config.yaml` (Windows) or `~/.config/manifest/config.yaml` (macOS/Linux) with an `aliases` section. See Configuration above.
 
 **`ModuleNotFoundError: No module named 'smart_scheduler'`**  
 Run `pip install -e .` from the repo root.

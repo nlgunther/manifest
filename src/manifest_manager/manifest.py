@@ -51,6 +51,7 @@ import os
 try:
     from .manifest_core import ManifestRepository, NodeSpec, ManifestView, Validator
     from .storage import PasswordRequired
+    from .config import Config
 except ImportError as e:
     print(f"Critical Error: Missing core modules. {e}")
     sys.exit(1)
@@ -391,6 +392,14 @@ class ManifestShell(cmd.Cmd):
         except ImportError:
             pass  # DataFrame support optional
 
+        # Auto-load default file from global config, if set.
+        cfg = Config()
+        default_file = cfg.get('startup.default_file')
+        if default_file:
+            autosc = cfg.get('startup.autosc', False)
+            cmd = f'load "{default_file}"' + (' --autosc' if autosc else '')
+            self.onecmd(cmd)
+
     def _exec(self, func):
         """Safe execution wrapper."""
         try: func()
@@ -506,7 +515,11 @@ class ManifestShell(cmd.Cmd):
         
         def _run():
             args = p.parse_args(shlex.split(arg))
-            
+
+            # Expand alias if the filename matches a key in config aliases.
+            aliases = Config().get('aliases', {})
+            filename = aliases.get(args.filename, args.filename)
+
             def on_success(result):
                 self.prompt = f"({os.path.basename(self.repo.filepath)}) "
             
@@ -519,7 +532,7 @@ class ManifestShell(cmd.Cmd):
                     rebuild_sidecar=args.rebuild_sidecar
                 )
             
-            self._with_password_retry(load_with_flags, args.filename, on_success)
+            self._with_password_retry(load_with_flags, filename, on_success)
         
         self._exec(_run)
 

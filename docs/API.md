@@ -39,6 +39,8 @@ load <filename> [--autosc] [--rebuildsc]
 ```bash
 load myproject.xml --autosc
 load backup.7z              # prompts for password
+load basic                  # expands alias defined in global config
+load basic --autosc         # alias expansion + sidecar
 ```
 
 ---
@@ -765,6 +767,25 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 ```
+
+### Global config — `%APPDATA%\manifest\config.yaml` (Windows) / `~/.config/manifest/config.yaml` (macOS/Linux)
+
+```yaml
+# Short names for long paths — used by the load command
+aliases:
+  basic: "g:/my drive/manifests/todo2026"
+  work:  "g:/my drive/manifests/work2026"
+  vt:    "g:/my drive/manifests/greensboro"
+
+# Auto-load a file on every manifest launch
+startup:
+  default_file: "g:/my drive/manifests/todo2026"
+  autosc: true
+```
+
+`aliases` keys are exact-match only — `load bas` does not expand `basic`. All normal flags (`--autosc`, `--rebuildsc`) apply after expansion.
+
+---
 
 ### `config/shortcuts.yaml`
 

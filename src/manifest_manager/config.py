@@ -43,6 +43,11 @@ class Config:
         'performance': {
             'cache_xpaths': True,
         },
+        'startup': {
+            'default_file': None,   # auto-load this file on every manifest launch
+            'autosc': False,        # pass --autosc when auto-loading
+        },
+        'aliases': {},              # short names for long paths, e.g. basic: "g:/my drive/..."
         # EXTENSION STUB: Add new config sections here
         # 'plugins': {
         #     'enabled': [],

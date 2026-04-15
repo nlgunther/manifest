@@ -22,6 +22,8 @@ load myproject.xml              # Load (creates if missing)
 load myproject.xml --autosc     # Load + create sidecar if missing
 load myproject.xml --rebuildsc  # Load + force-rebuild sidecar
 load backup.7z                  # Load encrypted (prompts password)
+load basic                      # Expand alias from global config
+load basic --autosc             # Alias + sidecar
 
 save                            # Overwrite current file
 save backup.xml                 # Save to new file
@@ -317,6 +319,22 @@ config reset
 - Tags have no spaces: `--tags urgent,bug` not `urgent, bug`
 
 ---
+
+---
+
+# GLOBAL CONFIG (`%APPDATA%\manifest\config.yaml`)
+
+```yaml
+aliases:
+  basic: "g:/my drive/manifests/todo2026"
+  work:  "g:/my drive/manifests/work2026"
+
+startup:
+  default_file: "g:/my drive/manifests/todo2026"
+  autosc: true
+```
+
+Create this file manually if it doesn't exist. `aliases` are exact-match; flags like `--autosc` still apply after expansion.
 
 ---
 
