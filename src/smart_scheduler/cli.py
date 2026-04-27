@@ -87,11 +87,25 @@ def cmd_list(cli, args):
         list projects             List only projects (summary)
         list tasks                List all tasks across all projects
         list tasks <project>      List tasks in specific project
+        list tasks --upcoming     Active tasks with no due date or a future due date
     """
     pos, opts = cli._opts(args)
     
     show_done = "show-done" in opts or "show_done" in opts
     show_all = "all" in opts
+    upcoming = "upcoming" in opts
+
+    # Filter function: upcoming = not done/cancelled AND (no due date OR due date >= today)
+    def _is_upcoming(t):
+        from datetime import date
+        if t.status in (TaskStatus.DONE, TaskStatus.CANCELLED):
+            return False
+        if t.due_date:
+            try:
+                return date.fromisoformat(t.due_date) >= date.today()
+            except ValueError:
+                return True  # unparseable date — include rather than silently drop
+        return True  # no due date — always included
     
     # Determine what to list
     what = pos[0] if pos else ("all" if show_all else "projects")
@@ -169,16 +183,20 @@ def cmd_list(cli, args):
             if not p:
                 return print(f"Project '{project_slug}' not found")
             
-            if show_done:
+            if upcoming:
+                tasks = [t for t in p.tasks if _is_upcoming(t)]
+            elif show_done:
                 tasks = p.tasks
             else:
                 tasks = [t for t in p.tasks if t.status not in (TaskStatus.DONE, TaskStatus.CANCELLED)]
             
             if not tasks:
-                return print(f"No {'active ' if not show_done else ''}tasks in '{p.name}'")
+                return print(f"No {'upcoming ' if upcoming else 'active ' if not show_done else ''}tasks in '{p.name}'")
             
             print(f"\n=== TASKS IN {p.name} ===")
-            if not show_done:
+            if upcoming:
+                print("(Showing upcoming: active tasks with no due date or future due date)\n")
+            elif not show_done:
                 print("(Hiding completed tasks. Use --show-done to see all)\n")
             
             for t in tasks:
@@ -190,16 +208,29 @@ def cmd_list(cli, args):
             
             for p in projects:
                 for t in p.tasks:
-                    if show_done or t.status not in (TaskStatus.DONE, TaskStatus.CANCELLED):
+                    if upcoming:
+                        include = _is_upcoming(t)
+                    else:
+                        include = show_done or t.status not in (TaskStatus.DONE, TaskStatus.CANCELLED)
+                    if include:
                         t._project_slug = p.slug
                         t._project_name = p.name
                         all_tasks.append(t)
             
+            # Sort by due date: tasks with a due date first (ascending), then no due date
+            from datetime import date
+            all_tasks.sort(key=lambda t: (
+                t.due_date is None,
+                t.due_date or ""
+            ))
+
             if not all_tasks:
-                return print("No tasks.")
+                return print("No upcoming tasks." if upcoming else "No tasks.")
             
-            print(f"\n=== ALL TASKS ===")
-            if not show_done:
+            print(f"\n=== {'UPCOMING ' if upcoming else ''}ALL TASKS ===")
+            if upcoming:
+                print("(Active tasks with no due date or a future due date)\n")
+            elif not show_done:
                 print("(Hiding completed tasks. Use --show-done to see all)\n")
             
             for t in all_tasks:
@@ -1515,6 +1546,7 @@ Usage:
   list projects             Project summary only
   list tasks                All tasks across all projects
   list tasks <project>      Tasks in specific project
+  list tasks --upcoming     Active tasks with no due date or a future due date
 
 Examples:
   list --all               # Detailed view, hides completed
